@@ -1,0 +1,626 @@
+---
+title: "Technology Attitude and VR Experience Exploration"
+author: "__Gwyn Omar Magoncia__"
+date: _Last Updated:_ `r format(Sys.time(), '%B %d, %Y')`
+output: 
+  pdf_document:
+    number_sections: true
+---
+
+```{r loading-libraries-and-reading-data, include = FALSE}
+knitr::opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE)
+library('here')
+library('data.table')
+library('magrittr')
+library('kableExtra')
+library('ggplot2')
+library('Kendall')
+library('DescTools')
+
+geq_scoring <- fread(here::here("Data", "geq.csv"))
+mtuas <- fread(here::here("Data", "mtuas.csv"))
+```
+
+```{r sourcing-functions}
+source(here::here("R", "theme.R"))
+source(here::here("R", "plot_functions.R"))
+source(here::here("R", "table_to_df_function.R"))
+```
+
+```{r data-prep}
+geq_scoring[, ID := as.numeric(substr(Q3, 11, 12))]
+setkey(geq_scoring, ID)
+setnames(geq_scoring, 'Q3', 'PID')
+
+mtuas[, ID := as.numeric(substr(Q11, 11, 12))] %>%
+    .[, Q9_10 := 6 - Q9_10, keyby = .(ID)] %>% # reverse scoring the negative items 
+    .[, Q9_11 := 6 - Q9_11, keyby = .(ID)] %>% # reverse scoring the negative items 
+    .[, Q9_12 := 6 - Q9_12, keyby = .(ID)] %>% # reverse scoring the negative items 
+    .[, SC16 := sum(c(Q9_1, Q9_2, Q9_3, Q9_7, Q9_8, Q9_9, Q9_10, Q9_11, Q9_12)), 
+      keyby = .(ID)] %>% # total score for attitude towards technology 
+    .[, SC16_mean := mean(c(Q9_1, Q9_2, Q9_3, Q9_7, Q9_8, Q9_9, Q9_10, Q9_11, Q9_12)), 
+      keyby = .(ID)] %>% # mean score for attitude towards technology
+    .[, SC16_median := median(c(Q9_1, Q9_2, Q9_3, Q9_7, Q9_8, Q9_9, Q9_10, Q9_11, Q9_12)), 
+      keyby = .(ID)] %>% # median score for attitude towards technology
+    .[, TA_mean := ifelse(SC16_mean <= 2, "Negative", # tech attitude using mean approach
+                          ifelse(SC16_mean >= 4, "Positive", "Mixed"))] %>%
+    .[, TA_median := ifelse(SC16_median <= 2, "Negative", # tech attitude using median approach
+                            ifelse(SC16_median >= 4, "Positive", "Mixed"))] %>%
+    .[, TA_mean := factor(TA_mean, levels = c("Negative", "Mixed", "Positive"))] %>%
+    .[, TA_median := factor(TA_median, levels = c("Negative", "Mixed", "Positive"))]
+setkey(mtuas, ID)
+# getting key variables from the MTUAS table
+mtuas_var <- mtuas[, .(Q11, Q12, Q13, ID, SC16, SC16_mean, SC16_median, TA_mean, TA_median)]
+setnames(mtuas_var, old = c('Q11','Q12', 'Q13'), new = c('PID', 'Gender', 'Age'))
+
+cols1 <- c(41:42)
+cols2 <- c(7:37)
+geq_mtuas <- merge(geq_scoring, mtuas_var, by = c('PID', 'ID'), all = TRUE) %>%
+                 .[!is.na(Q4),] %>% # Only 31 IDs, ID number 10 is missing
+                 .[, Q2_2_rev := 6 - Q2_2, keyby = .(ID)] %>% # reverse scoring the negative items
+                 .[, Q2_4_rev := 6 - Q2_4, keyby = .(ID)] %>%  
+                 .[, Q2_6_rev := 6 - Q2_6, keyby = .(ID)] %>%  
+                 .[, Q2_11_rev := 6 - Q2_11, keyby = .(ID)] %>%   
+                 .[, Q2_14_rev := 6 - Q2_14, keyby = .(ID)] %>% 
+                 .[, Q2_15_rev := 6 - Q2_15, keyby = .(ID)] %>% 
+                 .[, SC3 := sum(c(Q2_1, Q2_5, Q2_7, Q2_8, Q2_12, # total score for VR experience
+                                  Q2_16, Q2_2_rev, Q2_4_rev, Q2_6_rev, 
+                                  Q2_11_rev, Q2_14_rev, Q2_15_rev)), 
+                   keyby = .(ID, Q4)] %>% 
+                 .[, SC3_mean := mean(c(Q2_1, Q2_5, Q2_7, Q2_8, # mean score for VR experience
+                                        Q2_12, Q2_16, Q2_2_rev, Q2_4_rev, 
+                                        Q2_6_rev, Q2_11_rev, Q2_14_rev, Q2_15_rev)), 
+                   keyby = .(ID, Q4)] %>% 
+                 .[, SC3_median := median(c(Q2_1, Q2_5, Q2_7, Q2_8, # median score for VR experience
+                                            Q2_12, Q2_16, Q2_2_rev, Q2_4_rev, 
+                                            Q2_6_rev, Q2_11_rev, Q2_14_rev, Q2_15_rev)), 
+                   keyby = .(ID, Q4)] %>% 
+                 .[, VR_mean := ifelse(SC3_mean <= 2, "Negative", # VR Exp using mean approach
+                                       ifelse(SC3_mean >= 4, "Positive", "Mixed"))] %>%
+                 .[, VR_median := ifelse(SC3_median <= 2, "Negative", # VR Exp using median appoach
+                                         ifelse(SC3_median >= 4, "Positive", "Mixed"))] %>%
+                 .[, VR_mean := factor(VR_mean, levels = c("Negative", "Mixed", "Positive"))] %>%
+                 .[, VR_median := factor(VR_median, 
+                                         levels = c("Negative", "Mixed", "Positive"))] %>%
+                 .[, (cols1) := lapply(.SD, as.factor), .SDcols = cols1] %>%
+                 .[, (cols2) := lapply(.SD, factor, levels = c("1", "2", "3", "4", "5"), 
+                                       labels = c("Not at all", "Slightly", "Moderately", 
+                                                  "Fairly", "Extremely")), .SDcols = cols2]
+
+levels(geq_mtuas$Age) <- c("18-30", "31-40", "41-50", "51-60", "61-70", "70+")
+levels(geq_mtuas$Gender) <- c("Male", "Female")
+
+geq_mtuas_go <- geq_mtuas[Q4 <= 4,] # Oculus Go VR headset
+geq_mtuas_rift <- geq_mtuas[Q4 > 4,] # Oculus Rift VR headset
+```
+
+# __Introduction__
+
+This report contains the analysis of the Game Experience Questionnaire (GEQ) survey data. Currently, 
+the GEQ contains only the in-game and post-game modules. In this analysis, we will see how our 
+patient pool perceive virtual reality (VR) using two VR headsets, Oculus Go and Oculus Rift.
+
+# __Methods__
+
+## __Study Sample__
+
+32 patients went through a VR experiment at the Southwest Medical Associates (SMA) clinic in Las 
+Vegas, NV. Upon close inspection of the GEQ data, one patient was missing while the rest were
+divided into two groups based on the type of VR headsets used. 31 patients used Oculus Go while 18 
+used Oculus Rift.
+
+## __Scoring__
+
+```{r scoring}
+tbl_01 <- c("1", "Strongly disagree", "Not at all", 
+            "5", "Strongly agree", "Extremely")
+tbl_02 <- c("2", "Disagree", "Slightly", 
+            "4", "Agree", "Fairly")
+tbl_03 <- c("3", "Neither agree\nnor disagree", "Moderately",
+            "3", "Neither agree\nnor disagree", "Moderately")
+tbl_04 <- c("4", "Agree", "Fairly",
+            "2", "Disagree", "Sightly")
+tbl_05 <- c("5", "Strongly agree", "Extremely",
+            "1", "Strongly disagree", "Not at all")
+
+tbl <- ls(pattern = "tbl_")
+score_df <- as.data.frame(do.call(rbind, lapply(tbl, get)))
+rm(list = ls(pattern = "tbl_"))
+colnames(score_df) <- c("Scale", "Technology Attitude", "VR Game Experience",
+                        "Scale", "Technology Attitude", "VR Game Experience")
+
+score_df %>%
+  kable(align = c("c", "c", "c", "c", "c"), caption = "Reverse Scoring of Negative Items") %>%
+  add_header_above(c("Original" = 3, "New" = 3)) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+## __Chi-Square Test__
+
+\clearpage
+
+# __Results__
+
+## __Technology Attitude__
+
+```{r tech-attitude-go-median}
+TA_go <- geq_mtuas_go[, .(Count = .N), keyby = .(TA_median)] %>% 
+                    .[, .(TA_median, Count, 
+                          Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(TA_go, "TA_median", "Technology Attitude")
+
+TA_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r tech-attitude-go-median-gender}
+TA_go_gender <- geq_mtuas_go[, .(Count = .N), keyby = .(Gender, TA_median)] %>% 
+                           .[, .(TA_median, Gender, Count, 
+                                 Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(TA_go_gender, "TA_median", "Technology Attitude")
+
+TA_go_gender %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown by Gender for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r tech-attitude-go-median-age}
+TA_go_age <- geq_mtuas_go[, .(Count = .N), keyby = .(Age, TA_median)] %>% 
+                        .[, .(TA_median, Age, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(TA_go_age, "TA_median", "Technology Attitude")
+
+TA_go_age %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown by Age for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+```{r tech-attitude-rift-median}
+TA_rift <- geq_mtuas_rift[, .(Count = .N), keyby = .(TA_median)] %>% 
+                        .[, .(TA_median, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(TA_rift, "TA_median", "Technology Attitude")
+
+TA_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r tech-attitude-rift-median-gender}
+TA_rift_gender <- geq_mtuas_rift[, .(Count = .N), keyby = .(Gender, TA_median)] %>% 
+                               .[, .(TA_median, Gender, Count, 
+                                     Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(TA_rift_gender, "TA_median", "Technology Attitude")
+
+TA_rift_gender %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown by Gender for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r tech-attitude-rift-median-age}
+TA_rift_age <- geq_mtuas_rift[, .(Count = .N), keyby = .(Age, TA_median)] %>% 
+                            .[, .(TA_median, Age, Count, 
+                                  Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(TA_rift_age, "TA_median", "Technology Attitude")
+
+TA_rift_age %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown by Age for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+## __VR Game Experience__
+
+```{r vr-exp-go-median}
+VR_go <- geq_mtuas_go[, .(Count = .N), keyby = .(VR_median)] %>% 
+                    .[, .(VR_median, Count, 
+                          Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(VR_go, "VR_median", "VR Game Experience")
+
+VR_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r vr-exp-go-median-gender}
+VR_go_gender <- geq_mtuas_go[, .(Count = .N), keyby = .(Gender, VR_median)] %>% 
+                           .[, .(VR_median, Gender, Count, 
+                                 Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(VR_go_gender, "VR_median", "VR Game Experience")
+
+VR_go_gender %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown by Gender for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r vr-exp-go-median-age}
+VR_go_age <- geq_mtuas_go[, .(Count = .N), keyby = .(Age, VR_median)] %>% 
+                        .[, .(VR_median, Age, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(VR_go_age, "VR_median", "VR Game Experience")
+
+VR_go_age %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown by Age for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+```{r vr-exp-rift-median}
+VR_rift <- geq_mtuas_rift[, .(Count = .N), keyby = .(VR_median)] %>% 
+                        .[, .(VR_median, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(VR_rift, "VR_median", "VR Game Experience")
+
+VR_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r vr-exp-rift-median-gender}
+VR_rift_gender <- geq_mtuas_rift[, .(Count = .N), keyby = .(Gender, VR_median)] %>% 
+                               .[, .(VR_median, Gender, Count, 
+                                     Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(VR_rift_gender, "VR_median", "VR Game Experience")
+
+VR_rift_gender %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown by Gender for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r vr-exp-rift-median-age}
+VR_rift_age <- geq_mtuas_rift[, .(Count = .N), keyby = .(Age, VR_median)] %>% 
+                            .[, .(VR_median, Age, Count, 
+                                  Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(VR_rift_age, "VR_median", "VR Game Experience")
+
+VR_rift_age %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown by Age for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+__Contingency Table__
+
+```{r contingency-table-go-median}
+tbl_go <- table(geq_mtuas_go$TA_median, geq_mtuas_go$VR_median)
+chisq_go <- chisq.test(tbl_go) 
+table_to_df("go", tbl_go, chisq_go)
+```
+
+```{r contingency-table-rift-median}
+tbl_rift <- table(geq_mtuas_rift$TA_median, geq_mtuas_rift$VR_median)
+chisq_rift <- chisq.test(tbl_rift) 
+table_to_df("rift", tbl_rift, chisq_rift)
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge GEQ Post-game - Oculus Go}
+\vfill
+
+\clearpage
+
+```{r post-game-go-q1-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_1, "Q2_1", geq = 2, i = 1)
+```
+
+\vspace{1em} 
+
+```{r post-game-go-q2-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_2, "Q2_2", geq = 2, i = 2)
+```
+
+\clearpage
+
+```{r post-game-go-q3-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_3, "Q2_3", geq = 2, i = 3)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q4-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_4, "Q2_4", geq = 2, i = 4)
+```
+
+\clearpage
+
+```{r post-game-go-q5-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_5, "Q2_5", geq = 2, i = 5)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q6-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_6, "Q2_6", geq = 2, i = 6)
+```
+
+\clearpage
+
+```{r post-game-go-q7-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_7, "Q2_7", geq = 2, i = 7)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q8-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_8, "Q2_8", geq = 2, i = 8)
+```
+
+\clearpage
+
+```{r post-game-go-q9-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_9, "Q2_9", geq = 2, i = 9)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q10-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_10, "Q2_10", geq = 2, i = 10)
+```
+
+\clearpage
+
+```{r post-game-go-q11-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_11, "Q2_11", geq = 2, i = 11)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q12-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_12, "Q2_12", geq = 2, i = 12)
+```
+
+\clearpage
+
+```{r post-game-go-q13-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_13, "Q2_13", geq = 2, i = 13)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q14-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_14, "Q2_14", geq = 2, i = 14)
+```
+
+\clearpage
+
+```{r post-game-go-q15-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_15, "Q2_15", geq = 2, i = 15)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q16-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_16, "Q2_16", geq = 2, i = 16)
+```
+
+\clearpage
+
+```{r post-game-go-q17-tech-attitude}
+plot_tech_attitude(geq_mtuas_go, Q2_17, "Q2_17", geq = 2, i = 17)
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge GEQ Post-game - Oculus Rift}
+\vfill
+
+\clearpage
+
+```{r post-game-rift-q1-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_1, "Q2_1", geq = 2, i = 1)
+```
+
+\vspace{1em} 
+
+```{r post-game-rift-q2-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_2, "Q2_2", geq = 2, i = 2)
+```
+
+\clearpage
+
+```{r post-game-rift-q3-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_3, "Q2_3", geq = 2, i = 3)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q4-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_4, "Q2_4", geq = 2, i = 4)
+```
+
+\clearpage
+
+```{r post-game-rift-q5-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_5, "Q2_5", geq = 2, i = 5)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q6-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_6, "Q2_6", geq = 2, i = 6)
+```
+
+\clearpage
+
+```{r post-game-rift-q7-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_7, "Q2_7", geq = 2, i = 7)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q8-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_8, "Q2_8", geq = 2, i = 8)
+```
+
+\clearpage
+
+```{r post-game-rift-q9-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_9, "Q2_9", geq = 2, i = 9)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q10-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_10, "Q2_10", geq = 2, i = 10)
+```
+
+\clearpage
+
+```{r post-game-rift-q11-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_11, "Q2_11", geq = 2, i = 11)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q12-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_12, "Q2_12", geq = 2, i = 12)
+```
+
+\clearpage
+
+```{r post-game-rift-q13-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_13, "Q2_13", geq = 2, i = 13)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q14-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_14, "Q2_14", geq = 2, i = 14)
+```
+
+\clearpage
+
+```{r post-game-rift-q15-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_15, "Q2_15", geq = 2, i = 15)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q16-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_16, "Q2_16", geq = 2, i = 16)
+```
+
+\clearpage
+
+```{r post-game-rift-q17-tech-attitude}
+plot_tech_attitude(geq_mtuas_rift, Q2_17, "Q2_17", geq = 2, i = 17)
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge Appendix}
+\vfill
+
+\clearpage
+
+## __Technology Attitude__
+
+```{r tech-attitude-go-mean}
+TA_go <- geq_mtuas_go[, .(Count = .N), keyby = .(TA_mean)] %>% 
+                    .[, .(TA_mean, Count, 
+                          Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(TA_go, "TA_mean", "Technology Attitude")
+
+TA_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r tech-attitude-rift-mean}
+TA_rift <- geq_mtuas_rift[, .(Count = .N), keyby = .(TA_mean)] %>% 
+                        .[, .(TA_mean, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(TA_rift, "TA_mean", "Technology Attitude")
+
+TA_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Technology Attitude Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+## __VR Game Experience__
+
+```{r vr-exp-go-mean}
+VR_go <- geq_mtuas_go[, .(Count = .N), keyby = .(VR_mean)] %>% 
+                    .[, .(VR_mean, Count, 
+                          Percentage = round(Count * 100 / nrow(geq_mtuas_go), 1))]
+setnames(VR_go, "VR_mean", "VR Game Experience")
+
+VR_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r vr-exp-rift-mean}
+VR_rift <- geq_mtuas_rift[, .(Count = .N), keyby = .(VR_mean)] %>% 
+                        .[, .(VR_mean, Count, 
+                              Percentage = round(Count * 100 / nrow(geq_mtuas_rift), 1))]
+setnames(VR_rift, "VR_mean", "VR Game Experience")
+
+VR_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "VR Game Experience Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+__Contingency Table__
+
+```{r contingency-table-go-mean}
+tbl_go <- table(geq_mtuas_go$TA_mean, geq_mtuas_go$VR_mean)
+chisq_go <- chisq.test(tbl_go) 
+table_to_df("go", tbl_go, chisq_go)
+```
+
+```{r contingency-table-rift-mean}
+tbl_rift <- table(geq_mtuas_rift$TA_mean, geq_mtuas_rift$VR_mean)
+chisq_rift <- chisq.test(tbl_rift) 
+table_to_df("rift", tbl_rift, chisq_rift)
+```
+
+
+

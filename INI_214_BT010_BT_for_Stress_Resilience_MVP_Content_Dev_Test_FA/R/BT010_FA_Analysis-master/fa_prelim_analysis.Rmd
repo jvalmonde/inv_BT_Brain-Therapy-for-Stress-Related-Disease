@@ -1,0 +1,141 @@
+---
+title: "Preliminary Analysis of Focused Attention Data"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(stringr)
+
+setwd("~/BT010_FA_Analysis/")
+data = read_csv("./data/feature_data.csv")
+source("helpers.R")
+options(width = 90)
+```
+
+```{r, message=FALSE, echo=FALSE}
+responses = c(
+    "log_ecg_heart_rate_mean", "log_ecg_hrv_std_mean", "skin_temperature_mean", 
+    "eda_mean_mean", "log_eda_no_of_peaks_mean", "log_eda_lf_mean", "log_eda_hf_mean", 
+    "log_eda_lf_hf_ratio_mean"
+)
+
+ecg_dat = data %>% 
+    mutate(
+        ecg_heart_rate_mean = ifelse(
+            ecg_heart_rate_mean < 50, NA, ecg_heart_rate_mean
+        ), 
+        ecg_hrv_std_mean = ifelse(
+            ecg_hrv_std_mean > 250, NA, ecg_hrv_std_mean
+        ), 
+        skin_temperature_mean = ifelse(
+            skin_temperature_mean < 25, NA, skin_temperature_mean
+        ), 
+        log_ecg_heart_rate_mean = log(ecg_heart_rate_mean),
+        log_ecg_hrv_std_mean = log(ecg_hrv_std_mean),
+        log_eda_hf_mean = log(eda_hf_mean), 
+        log_eda_lf_mean = log(eda_lf_mean), 
+        log_eda_lf_hf_ratio_mean = log(eda_lf_hf_ratio_mean),
+        log_eda_no_of_peaks_mean = log(eda_no_of_peaks_mean)
+    ) %>%
+    rename(
+        pid = Participant, 
+        type = Type
+    ) %>%
+    select(
+        pid, type, Difficulty, Perceptibility, context_order, one_of(responses)
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        difficulty = as.factor(ifelse(Difficulty == 0, 'L', 'H')), 
+        perceptibility = as.factor(ifelse(Perceptibility == 0, 'L', 'H'))
+    ) %>%
+    select(-context_order, - Difficulty, -Perceptibility)
+```
+
+# Summary
+
+This document contains an analysis of the Focused Attention data using [Model
+3](https://rndtools.uhgrd.com/Print/InitiativeDocument/1090/MVP%20FA_data%20analysis%20plan_10.04.19_gka.pdf)
+on the [original feature
+list](https://rndtools.uhgrd.com/Project/Initiative/502#) which was provided
+before the start of the current
+[BT010-FA](https://rndtools.uhgrd.com/Project/Initiative/502) initiative.  The
+results show that, for four of eight features, VR leads to a different
+physiological response compared to 2D, but only one feature seems to be
+materially effected by game difficulty. Consequently, this analysis provides
+little guidance on how game parameters can be manipulated to keep a patient's
+stress response in a prespecified range using the current feature set. Next
+steps for the initiative would be to explore new features that
+may be associated with stress response.
+
+# Results
+
+For each feature, we show Type III sum of squares, all pairwise differences for
+the three-way treatment interactions, the difference in difference of
+physiological response between treatments delivered in 2D versus VR, and a plot
+of raw and fitted patient data with a 95% bootstrapped confidence interval for
+the respective mean. We dropped mean heart rate readings below 50, heart rate
+variability above 250, and skin temperature readings below 25 degrees celsius
+from the analysis, and log transformed most features to meet the normality
+assumptions for an ANOVA. Only the pairwise contrasts adjust for multiple
+comparisons (using Tukeys method), and this adjustment is made on the feature
+level, i.e. there are no adjustments for the fact that we conduct the analysis
+on eight different physiological features. The effects for game difficulty and
+perceptibility are not significant for most features; consequently, the results
+of our analysis do not provide clear support for the hypothesis that game
+parameters can be manipulated to keep a patient's stress response in a
+prespecified range.
+
+In our final analysis for the initiative, we need to adequately deal with
+outliers and bad data; for example, a heart rate of less than 25 is likely an
+erroneous data point. We need to agree upon ranges for parameters which make
+scientific sense, i.e. heart rate between 50 and 200, skin temperature above 25
+degrees celsius, etc.  As we go to real-time feature creation in our biofeedback
+pilots, adequate plans for dealing with erroneous data are needed. We ask that
+these ranges are included in the list of parameters that the Research team is
+expected to provide as part of deliverable two in grant one of
+[BT010-FA](https://rndtools.uhgrd.com/Project/Initiative/502).
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+for(i in 1:length(responses))
+{
+    resp = responses[i]
+    formula_string = paste0(
+        resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+    )
+    glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+    glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+    cat("################################################################### \n")
+    cat("The response/dependent variable is:", resp, "\n")
+    cat("################################################################### \n")
+    cat("#**************************************************# \n")
+    cat("ANOVA Table \n")
+    cat("#**************************************************# \n")
+    anova(glm_dat_lmerTest, type = "III") %>% print()
+    cat("#**************************************************# \n")
+    cat("All third order pairwise contrasts \n")
+    cat("Symbol order is Type:Diff:Percp \n")
+    cat("#**************************************************# \n")
+    emmeans(glm_dat_lme4, 
+            specs = pairwise ~ type:difficulty:perceptibility
+        )$contrasts  %>%
+        tbl_df(.) %>%
+        print(n = 50)
+    cat("#**************************************************# \n")
+    cat("Difference in difference (2D - 3D) \n")
+    cat("HL means Difficulty is High and Percept is Low \n")
+    cat("Lower and Upper are from bootstrapped 95% CIs \n")
+    cat("#**************************************************# \n")
+    get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+    plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+    print(plots[[1]])
+    print(plots[[2]])
+}
+```
+

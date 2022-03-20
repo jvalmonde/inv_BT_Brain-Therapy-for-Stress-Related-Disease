@@ -1,0 +1,1173 @@
+---
+title: "MTUAS Exploration"
+author: "__Joyvalerie Mondejar, Gwyn Omar Magoncia__"
+date: _Last Updated:_ `r format(Sys.time(), '%B %d, %Y')`
+output: 
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+geometry: margin=1in
+    
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r, eval=FALSE, echo=FALSE}
+This file contains the 
+
+__Input:__ File containing the scores on game experience questionnaire which is the mtuas.csv
+
+__Output:__ TBD
+
+_Date Created_: `r format(as.Date("2020-02-14"), "%B %d, %Y")`
+```
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE)
+library('here')
+library('data.table')
+library('magrittr')
+library('kableExtra')
+library('ggplot2')
+library('arsenal')
+```
+
+```{r sourcing-functions}
+source(here::here("R", "plot_functions.R"))
+```
+
+```{r read-data}
+mtuas <- fread(here::here("Data", "mtuas.csv"))
+mtuas[, ID := as.numeric(substr(Q11, 11, 12))]
+setkey(mtuas, ID)
+```
+
+```{r}
+uhg1 = rgb(red = 45, green = 95, blue = 167, maxColorValue = 255)      # #2d5fa7    UHG blue
+uhg2 = rgb(red = 247, green = 152, blue = 55, maxColorValue = 255)     # #f79837    UHG orange
+uhg3 = rgb(red = 114, green = 192, blue = 96, maxColorValue = 255)     # #72c060    UHG green
+uhg4 = rgb(red = 234, green = 75, blue = 77, maxColorValue = 255)      # #ea4b4d    UHG red
+uhg5 = rgb(red = 2, green = 142, blue = 167, maxColorValue = 255)      # #028ea7    UHG teal
+uhg6 = rgb(red = 103, green = 93, blue = 168, maxColorValue = 255)     # #675da8    UHG purple
+uhgGrey = rgb(red = 166, green = 166, blue = 166, maxColorValue = 255) # #A6A6A6    UHG gray 
+```
+
+```{r plot theme}
+text_size_ = 9
+theme_joy_s = ggplot2::theme(axis.line = ggplot2::element_line(color = uhgGrey, size = 2),
+                    panel.grid.major.y = ggplot2::element_line(color = uhgGrey, size = 0.2, 
+                                                               linetype = 2),
+                    panel.background = ggplot2::element_rect(fill = 'white'),
+                    axis.ticks = ggplot2::element_line(size = 1.5),        # Add axis ticks
+                    axis.ticks.length = ggplot2::unit(0.15, 'cm'),
+                    axis.text = ggplot2::element_text(size = text_size_, color = "#222222"),
+                    axis.text.x = ggplot2::element_text(size = text_size_, vjust = 0.9),
+                    axis.text.y = ggplot2::element_text(size = text_size_),
+                    axis.title = ggplot2::element_text(size = text_size_, face = 'bold'),
+                    legend.position = 'right',
+                    legend.title = ggplot2::element_text(size = text_size_),
+                    legend.text = ggplot2::element_text(size = text_size_ - 0),
+                    legend.margin = ggplot2::margin(t = 0.2, r = 0.2, l = 0.2, b = 0.2, 
+                                                    unit = 'cm'),
+                    legend.background = ggplot2::element_blank(),
+                    legend.key = ggplot2::element_blank(),     # remove the sorrounding gray color
+                    panel.spacing = ggplot2::unit(5, 'pt'),
+                    strip.text = ggplot2::element_text(size = text_size_ + 1),
+                    plot.title = ggplot2::element_text(size = text_size_ + 4, face = 'bold', 
+                                                       hjust = 0),
+                    plot.subtitle = ggplot2::element_text(size = text_size_ + 2, hjust = 0.5))
+
+```
+
+```{r mutate-variables, include=FALSE}
+setnames(mtuas, c('Q12', 'Q13'), c('Gender', 'Age'))
+mtuas[, Gender := factor(Gender, levels = 1:2, labels = c('Male', 'Female'))]
+mtuas[, Q4 := factor(Q4, levels = 1:2, labels = c('Yes', 'No'))]
+# setnames(mtuas, 'Q4', 'Have_Facebook')
+mtuas[, Age := factor(Age, levels = 1:6, labels = c("18-30", "31-40", "41-50", "51-60", "61-70", "70+"))]
+
+mtuas[, paste0(rep(c("Q8"), 4), "_", 1:4) := lapply(.SD, factor, levels = 1:9, 
+                                                    labels =  c("0", "1 - 50", "51 - 100", "101 - 175", 
+                                                                "176 - 250", "251 - 375", "376 - 500", 
+                                                                "501 - 750", "751 or more")),
+      .SDcols = paste0(rep(c("Q8"), 4), "_", 1:4)]
+
+
+Q_labels <- c('Never', 'Once a month', 'Several times a month', 
+                                                     'Once a week', 'Several times a week','Once a day', 
+                                                     'Several times a day', 'Once an hour', 
+                                                     'Several times an hour', 'All the time')
+
+mtuas[, c('Q1_1', 'Q1_2', 'Q1_3', 'Q1_4') := lapply(.SD, factor, levels = 1:10, labels = Q_labels), 
+      .SDcols = c('Q1_1', 'Q1_2', 'Q1_3', 'Q1_4')]
+
+mtuas[, paste0(rep(c("Q2"), 14), "_", 1:14) := lapply(.SD, factor, levels = 1:10, labels = Q_labels),
+      .SDcols = paste0(rep(c("Q2"), 14), "_", 1:14)]
+
+mtuas[, paste0(rep(c("Q3"), 13), "_", 1:13) := lapply(.SD, factor, levels = 1:10, labels = Q_labels),
+      .SDcols = paste0(rep(c("Q3"), 13), "_", 1:13)]
+
+mtuas[, paste0(rep(c("Q7"), 9), "_", 1:9) := lapply(.SD, factor, levels = 1:10, labels = Q_labels),
+      .SDcols = paste0(rep(c("Q7"), 9), "_", 1:9)]
+
+mtuas[, paste0(rep(c("Q9"), 16), "_", 1:16) := lapply(.SD, factor, levels = 1:5, 
+                                                      labels = c('Strongly agree', 'Agree', 'Neither agree nor disagree', 'Disagree', 'Strongly disagree')),
+      .SDcols = paste0(rep(c("Q9"), 16), "_", 1:16)]
+
+
+```
+
+
+
+# __Introduction__
+
+# __Results__
+
+## __Demographics__
+
+
+
+```{r gender-breakdown}
+g_tab <- mtuas[, .(Count = .N), keyby = .(Gender)] %>% 
+  .[, Percent := round(Count/32 * 100, 1), keyby = Gender] # %>% print
+knitr::kable(g_tab, align = c('l', 'c', 'c'), caption = 'Gender breakdown') %>% 
+  row_spec(0, bold = TRUE) %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+```{r age-breakdown}
+tab <- mtuas[, .(Count = .N), keyby = .(Age)] %>% 
+  .[, Percent := round(Count/32 * 100, 1), keyby = Age] # %>% print
+knitr::kable(tab, align = c('l', 'c', 'c'), caption = 'Age breakdown') %>% 
+  row_spec(0, bold = TRUE) %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+\clearpage
+
+## __Subscale Scores__
+
+\center
+
+```{r}
+kable(mtuas[, .(Mean = mean(SC0), Median = median(SC0)), keyby = Gender], caption = "Males had lower overall media and technology scores", digits = 0) %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC0), Median = median(SC0)), keyby = Age], caption = "", digits =  0) %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+```
+
+
+
+```{r}
+kable(mtuas[, .(Mean = mean(SC1), Median = median(SC1)), keyby = Gender], caption = "Males use smart phone less frequently for media and technology") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC1), Median = median(SC1)), keyby = Age], caption = "Older participants had less utilization of smart phone") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+
+```{r}
+kable(mtuas[, .(Mean = mean(SC2), Median = median(SC2)), keyby = Gender], caption = "Males had leser social media usage") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC2), Median = median(SC2)), keyby = Age], caption = "41 to 60 years old used smart phone more frequently") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+```
+
+```{r}
+
+kable(mtuas[, .(Mean = mean(SC3), Median = median(SC3)), keyby = Gender], caption = "Internet searching are equally being used by males and females") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+kable(mtuas[, .(Mean = mean(SC3), Median = median(SC3)), keyby = Age], caption = "Internet searching by age") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+```{r}
+
+kable(mtuas[, .(Mean = mean(SC4), Median = median(SC4)), keyby = Gender], caption = "Males and females had the same frequency of email activities") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC4), Median = median(SC4)), keyby = Age], caption = "Males at 61- 70 years are attending emails more freqently followed by the younger males") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+```{r}
+
+kable(mtuas[, .(Mean = mean(SC5), Median = median(SC5)), keyby = Gender], caption = "Media Sharing by Gender") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC5), Median = median(SC5)), keyby = Age], caption = "Media Sharing by Age") %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+\clearpage
+
+```{r, eval=FALSE}
+setnames(mtuas, old = names(mtuas[, 69:83]), new = c('Score', 'SPU', 'GSMU', 'IS', 'Emailing', 'MediaS',
+                                                     'TMessaging', 'VGaming', 'FF', 'PCalling', 'TVViewing', 'Positive_Attitude_TT', 'AABWT', 'NATT', 'PFTS'))
+
+# c(paste0(rep(c("SC"), 8), 0:7), paste0(rep(c("SC"), 7), 9:15))
+
+# subscale_labels = list(SC0 = "SC00", SC1 = "SC01", SC2 = "SC02", SC3 = "SC03", SC4 = "SC04", SC5 = "SC05", SC6 = "SC06", SC7 = "SC07", SC9 = "SC09", SC10 = "SC10", SC11 = "SC11", SC12 = "SC12", SC13 = "SC13", SC14 = "SC14", SC15 = "SC15")
+
+subscale_labels = list(Zero = 'Zero', One = 'One', Two ='Two', Three = 'Three', Four = 'Four', Five = 'Five', Six = 'Six', Seven = 'Seven', Nine = 'Nine', Ten = 'Ten', Eleven = 'Eleven',  Twelve = 'Twelve', Thirteen = 'Thirteen', Fourteen = 'Fourteen', Fifteen = 'Fifteen')
+
+subscale_labels = list(Score = 'Score', SPU = 'SPU', GMSU = 'GSMU', IS = 'IS', Emailing = 'Emailing', 
+                       MediaS = 'MediaS', TMessaging = 'TMessaging', VGaming = 'VGaming', FF = 'FF',
+                       PCalling= 'PCalling', TVViewing = 'TVViewing', 
+                       Positive_Attitude_TT = 'Positive_Attitude_TT', AABWT = 'AABWT', NATT = 'NATT', 
+                       PFTS = 'PFTS')
+
+# subscale_labels = list(SC0 = 'Score', SC1 = 'SPU', SC2 = 'GSMU', SC3 = 'IS', SC4 = 'Emailing', 
+#                        SC5 = 'MediaS', SC6 = 'TMessaging', SC7 = 'VGaming', SC9 = 'FF',
+#                        SC10= 'PCalling', SC11 = 'TVViewing', 
+#                        SC12 = 'Positive_Attitude_TT', SC13 = 'AABWT', SC14 = 'NATT', 
+#                        SC15 = 'PFTS')
+
+score_table = data.frame()
+scores = names(mtuas[, 69:83])
+# i = 1 # 69
+# i = 2 # 70
+# i = 3
+# i = 4  # 72  SC3
+# i = 5
+# i = 6
+# i = 7
+# i = 8
+# i = 9
+#   i = 10 
+#   i = 11
+#   i = 12
+#   i = 13
+#   i = 14
+#   i = 15
+for (i in 1:length(scores)) {
+  column_num = grep(scores[i], colnames(mtuas))
+  cnt = grep(scores[i], names(subscale_labels))
+  a1 = paste0("meanCI(", scores[i], ")[[1]]")
+  a2 = paste0("meanCI(", scores[i], ")[[2]]")
+  a3 = paste0("meanCI(", scores[i], ")[[3]]")
+  summary_tab = mtuas %>% 
+    select(Gender, scores[i]) %>% 
+    group_by(Gender) %>% 
+    summarise(Mean = eval(parse(text = a1)), Lower = eval(parse(text = a2)), Upper = eval(parse(text = a3)))
+  
+  scores[i] = subscale_labels[[cnt]]
+  summary_tab = summary_tab %>% 
+    mutate(Subscale = scores[i]) %>% 
+    select(Gender, Subscale, everything()) %>% 
+    data.frame()
+  score_table = rbind(score_table, summary_tab)
+  score_table
+}
+
+# saveRDS(score_table, here::here("Data", "Score_table_gender.rds"))
+```
+
+```{r}
+score_table_gender <- data.table(readRDS(here::here("Data", "Score_table_gender.rds")))
+score_table_gender[, Item := rep(1:15, c(2,2,2,2,2,2,2,2,2,2,2,2,2,2,2))]
+# score_table_gender[, Subscale := factor(Subscale, levels = 'Score', 'SPU', 'GSMU', 'IS', 'Emailing', 'MediaS', 
+#                                                      'TMessaging', 'VGaming', 'FF', 'PCalling', 'TVViewing', 'Positive_Attitude_TT', 'AABWT', 'NATT', 'PFTS')]
+score_table_gender$Subscale <- factor(score_table_gender$Subscale, 
+                                      levels = c('Score', 'SPU', 'GSMU', 'IS', 'Emailing', 'MediaS', 
+                                                     'TMessaging', 'VGaming', 'FF', 'PCalling', 'TVViewing', 'Positive_Attitude_TT', 'AABWT', 'NATT', 'PFTS'))
+
+
+```
+
+
+```{r}
+ggplot(score_table_gender[Subscale == "Score"], aes(x = Gender, y = Mean, fill = Gender)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5)) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Overall Usage Score by Gender") + ylab("Mean Usage Score") + xlab("") + 
+  theme_joy_s
+```
+
+\clearpage
+
+```{r}
+ggplot(score_table_gender[Item %in% c(2:11)], aes(x = Gender, y = Mean, fill = Gender)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6, "yellow", "pink", "darkred", "magenta")) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Usage Score by Gender") + ylab("Mean Usage Score") + xlab("") + 
+  theme_joy_s
+
+ggplot(score_table_gender[Item %in% c(12:15)], aes(x = Gender, y = Mean, fill = Gender)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6)) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Attitude Score by Gender") + ylab("Mean Attitude Score") + xlab("") + 
+  theme_joy_s
+```
+
+
+```{r, eval=FALSE}
+score_table = data.frame()
+scores = names(mtuas[, 69:83])
+# i = 1 # 69
+# i = 2 # 70
+# i = 3
+# i = 4  # 72  SC3
+# i = 5
+# i = 6
+# i = 7
+# i = 8
+# i = 9
+#   i = 10 
+#   i = 11
+#   i = 12
+#   i = 13
+#   i = 14
+#   i = 15
+for (i in 1:length(scores)) {
+  column_num = grep(scores[i], colnames(mtuas))
+  cnt = grep(scores[i], names(subscale_labels))
+  a1 = paste0("meanCI(", scores[i], ")[[1]]")
+  a2 = paste0("meanCI(", scores[i], ")[[2]]")
+  a3 = paste0("meanCI(", scores[i], ")[[3]]")
+  summary_tab = mtuas %>% 
+    select(Age, scores[i]) %>% 
+    group_by(Age) %>% 
+    summarise(Mean = eval(parse(text = a1)), Lower = eval(parse(text = a2)), Upper = eval(parse(text = a3)))
+  
+  scores[i] = subscale_labels[[cnt]]
+  summary_tab = summary_tab %>% 
+    mutate(Subscale = scores[i]) %>% 
+    select(Age, Subscale, everything()) %>% 
+    data.frame()
+  score_table = rbind(score_table, summary_tab)
+  score_table
+}
+
+# saveRDS(score_table, here::here("Data", "Score_table_age.rds"))
+```
+
+```{r}
+score_table_age<- data.table(readRDS(here::here("Data", "Score_table_age.rds")))
+score_table_age[, Item := rep(1:15, c(6,6,6,6,6,6,6,6,6,6,6,6,6,6,6))]
+score_table_age$Subscale <- factor(score_table_age$Subscale, 
+                                      levels = c('Score', 'SPU', 'GSMU', 'IS', 'Emailing', 'MediaS', 
+                                                     'TMessaging', 'VGaming', 'FF', 'PCalling', 'TVViewing', 'Positive_Attitude_TT', 'AABWT', 'NATT', 'PFTS'),
+                                      labels = c('Score', 'Smartphone Usage', 'General Social Media Usage',
+                                                 'Internet Searching', 'E-mailing', 'Media Sharing', 
+                                                 'Text Messaging', 'Video Gaming', 'Facebook Friendships', 
+                                                 'Phone Calling', 'TV Viewing', 'Postive Attitides TT', 
+                                                 'Dependence on Technology', 'Negative Attitudes TT', 
+                                                 'Preference for Task Switching'))
+
+
+```
+
+
+```{r}
+ggplot(score_table_age[Subscale == "Score"], aes(x = Age, y = Mean, fill = Age)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6)) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Overall Usage Score by Age") + ylab("Mean Usage Score") + xlab("") + 
+  theme_joy_s
+```
+
+\clearpage
+
+```{r plot-function}
+plot_by_age <- function(col1, col2){
+  ggplot(score_table_age[Item %in% c(col1, col2)], aes(x = Age, y = Mean, fill = Age)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6, "yellow", "pink", "darkred", "magenta")) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Usage Score by Age") + ylab("Mean Usage Score") + xlab("") + 
+  theme_joy_s
+}
+
+plot_by_age_att <- function(col1, col2){
+  ggplot(score_table_age[Item %in% c(col1, col2)], aes(x = Age, y = Mean, fill = Age)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, position = position_dodge(0.9)) + 
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6, "yellow", "pink", "darkred", "magenta")) + 
+  facet_grid(. ~ Subscale) + 
+  guides(fill = FALSE) + 
+  ggtitle("Mean (CI) Attitide Score by Age") + ylab("Mean Attitide Score") + xlab("") + 
+  theme_joy_s
+}
+```
+
+```{r}
+plot_by_age(2, 3)
+```
+
+\vspace{1em}
+
+```{r}
+plot_by_age(4, 5)
+```
+
+\clearpage
+
+```{r}
+plot_by_age(6, 7)
+``` 
+
+\vspace{1em}
+
+```{r}
+plot_by_age(8, 9)
+```
+
+```{r}
+plot_by_age(10, 11)
+```
+
+\vspace{1em}
+
+```{r}
+plot_by_age(12, 13)
+```
+
+\clearpage
+
+```{r}
+plot_by_age_att(12, 13)
+```
+
+\vspace{1em}
+
+```{r}
+plot_by_age_att(14, 15)
+```
+
+\clearpage
+
+Multitasking and technology usage
+
+```{r}
+round(cor(mtuas[, .(SC15, SC0, SC1, SC2, SC3, SC4, SC5, SC6, SC7, SC9, SC10, SC11)]), 2)
+
+# mtuas[, cor(SC15, SC)]
+# mtuas[, cor(SC15, SC)]
+# mtuas[, cor(SC15, SC)]
+# mtuas[, cor(SC15, SC)]
+```
+
+
+```{r, eval=FALSE}
+mtuas[, lapply(.SD, mean), .SDcols = names(mtuas[, 69:83]), keyby = Gender]
+```
+
+
+```{r, eval=FALSE}
+kable(mtuas[, .(Mean = mean(Score), Median = median(Score)), keyby = Gender], caption = "Males had lower overall media and technology scores", digits = 0) %>% 
+  row_spec(0, bold = TRUE) %>% 
+  kable_styling(full_width = F, latex_options = 'hold_position')
+
+kable(mtuas[, .(Mean = mean(SC0), Median = median(SC0)), keyby = Age], caption = "", digits =  0) %>% 
+  row_spec(0, bold = TRUE) %>% 
+kable_styling(full_width = F, latex_options = 'hold_position')
+
+# kable(mtuas[, .(Mean = mean(SC0), Median = median(SC0)), keyby = .(Gender, Age)], caption = "Overall media and technology scores", digits =  0) %>% 
+#   row_spec(0, bold = TRUE) %>% 
+# kable_styling(full_width = F, latex_options = 'hold_position')
+```
+
+## __Exploration Plots__
+
+```{r, eval=FALSE}
+temp <- mtuas[, .N, keyby = .(Q2_1, Gender)] %>% 
+  .[, Perc := round(N/sum(N) * 100, 1)]
+plot_result(mtuas, question_item = Q2_1, plot_title = "Send and receive text mesasges on mobile phone")
+
+
+data = mtuas
+question_item = "Q2_1"
+plot_title = "Send and receive text mesasges on mobile phone"
+plot_result <- function(data, question_item, plot_title) {
+  
+  # temp <- data[, .N, keyby = .(question_item, "Gender")] %>% 
+  temp <- data[, .N, keyby = c(paste(question_item, "Gender", sep =',' ))] %>% 
+  .[, Perc := round(N/sum(N) * 100, 1)]
+  
+  # ggplot(temp, paste0("aes","(", question_item , ", ", "y = Perc", ", ", "fill = Gender)"  )) +
+  paste0("ggplot(temp ",  ",",  "aes","(", question_item , ", ", "y = Perc", ", ", "fill = Gender)", ") +"  )
+  # ggplot(temp, aes(question_item, y = Perc, fill = Gender)) +
+  geom_bar(stat = 'identity', position = 'stack') +
+  labs(x = '', y = 'Percent', title = plot_title) +
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4)) +
+  theme_joy_s +
+  theme(legend.title=element_blank()) + 
+  coord_flip() 
+
+  
+}
+
+  geneOfInterest <- df[ df$SYMBOL == x, 1]
+  df %>%
+    filter(SYMBOL == x) %>% 
+    gather(key=Patient, value=values, -GENE,-SYMBOL) %>% 
+    ggplot(aes(x=Patient, y=values, color=GENE)) +
+    geom_point() # +
+    labs(title=paste0(geneOfInterest, " plot"), subtitle =paste0("Symbol: ", x)) 
+```
+
+### __Usage Subscales__
+
+
+
+
+\clearpage
+
+```{r Q1}
+plot_gender_mtuas(mtuas, Q1_1, "Q1_1", "Usage", 1)
+```
+
+\vspace{.2em}
+
+```{r}
+plot_age_mtuas(mtuas, Q1_1, "Q1_1", "Usage" )
+```
+
+```{r}
+plot_gender_mtuas(mtuas, Q1_2, "Q1_2", "Usage", 2)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,    Q1_2, "Q1_2" , "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q1_3, "Q1_3", "Usage", 3 )
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q1_3, "Q1_3", "Usage")
+```
+
+
+```{r, eval=TRUE}
+plot_gender_mtuas(mtuas, Q1_4, "Q1_4", "Usage", 4 )
+```
+
+\vspace{1em}
+
+```{r, eval=TRUE}
+plot_age_mtuas(mtuas, Q1_4, "Q1_4", "Usage")
+```
+
+
+Please indicate how often you do each of the following activities on your mobile phone.
+
+\clearpage
+
+```{r Q2}
+plot_gender_mtuas(mtuas, Q2_1, "Q2_1", "Usage", 5)
+```
+
+\vspace{.5em}
+
+```{r}
+plot_age_mtuas(mtuas,  Q2_1, "Q2_1", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas, Q2_2, "Q2_2", "Usage", 6)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,    Q2_2, "Q2_2" , "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_3, "Q2_3", "Usage", 7)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_3, "Q2_3", "Usage")
+```
+
+
+```{r, eval=TRUE}
+plot_gender_mtuas(mtuas, Q2_4, "Q2_4", "Usage", 8)
+```
+
+\vspace{1em}
+
+```{r, eval=TRUE}
+plot_age_mtuas(mtuas, Q2_4, "Q2_4", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_5, "Q2_5", "Usage", 9)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_5, "Q2_5", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_6, "Q2_6", "Usage", 10)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_6, "Q2_6", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_7, "Q2_7", "Usage", 11)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_7, "Q2_7", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_8, "Q2_8", "Usage", 12)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q2_8, "Q2_8", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_9, "Q2_9", "Usage", 13)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_9, "Q2_9", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_10, "Q2_10", "Usage", 14)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_10, "Q2_10", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_11, "Q2_11", "Usage", 15)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_11, "Q2_11", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_12, "Q2_12", "Usage", 16)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_12, "Q2_12", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_13, "Q2_13", "Usage", 17)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_13, "Q2_13", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q2_14, "Q2_14", "Usage", 18)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q2_14, "Q2_14", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_1, "Q3_1", "Usage", 19)
+```
+
+\vspace{1em}
+
+```{r Q3}
+plot_age_mtuas(mtuas,     Q3_1, "Q3_1", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_2, "Q3_2", "Usage", 20)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_2, "Q3_2", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_3, "Q3_3", "Usage", 21)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_3, "Q3_3", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_4, "Q3_4", "Usage", 22)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_4, "Q3_4", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_5, "Q3_5", "Usage", 23)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_5, "Q3_5", "Usage")
+```
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_6, "Q3_6", "Usage", 24)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_6, "Q3_6", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_7, "Q3_7", "Usage", 25)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_7, "Q3_7", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_8, "Q3_8", "Usage", 26)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_8, "Q3_8", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_9, "Q3_9", "Usage", 27)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q3_9, "Q3_9", "Usage")
+```
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_10, "Q3_10", "Usage", 28)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_10, "Q3_10", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_11, "Q3_11", "Usage", 29)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_11, "Q3_11", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_12, "Q3_12", "Usage", 30)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_12, "Q3_12", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q3_13, "Q3_13", "Usage", 31)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q3_13, "Q3_13", "Usage")
+```
+
+
+```{r}
+ggplot(mtuas[, .N, keyby = .(Q4, Gender)] %>% 
+  .[, Perc := round(N/sum(N) * 100, 1)], aes(Q4, y = Perc, fill = Gender)) +
+  geom_bar(stat = 'identity', position = 'stack') +
+  labs(x = '', y = 'Percent', title = 'Do you have a Facebook account?') +
+  scale_fill_manual(values = c(uhg1, uhg2, uhg3, uhg4)) +
+  theme_joy_s +
+  theme(legend.title=element_blank()) 
+```
+
+\clearpage
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_1, "Q7_1", "Usage", 32)
+```
+
+\vspace{1em}
+
+```{r Q7}
+plot_age_mtuas(mtuas,     Q7_1, "Q7_1", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_2, "Q7_2", "Usage", 33)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_2, "Q7_2", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_3, "Q7_3", "Usage", 34)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_3, "Q7_3", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_4, "Q7_4", "Usage", 35)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_4, "Q7_4", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_5, "Q7_5", "Usage", 36)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_5, "Q7_5", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_6, "Q7_6", "Usage", 37)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_6, "Q7_6", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_7, "Q7_7", "Usage", 38)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_7, "Q7_7", "Usage")
+```
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_8, "Q7_8", "Usage", 39)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_8, "Q7_8", "Usage")
+```
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q7_9, "Q7_9", "Usage", 40)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q7_9, "Q7_9", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q8_1, "Q8_1", "Usage", 41)
+```
+
+\vspace{1em}
+
+```{r Q8}
+plot_age_mtuas(mtuas,     Q8_1, "Q8_1", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q8_2, "Q8_2", "Usage", 42)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q8_2, "Q8_2", "Usage")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q8_3, "Q8_3", "Usage", 43)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q8_3, "Q8_3", "Usage")
+```
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q8_4, "Q8_4", "Usage", 44)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q8_4, "Q8_4", "Usage")
+```
+
+
+### __Attitudes Subscales__
+
+\clearpage
+
+```{r Q9}
+plot_gender_mtuas(mtuas,  Q9_1, "Q9_1", "Attitudes", 1)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_1, "Q9_1", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_2, "Q9_2", "Attitudes", 2)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_2, "Q9_2", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_3, "Q9_3", "Attitudes", 3)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_3, "Q9_3", "Attitudes")
+```
+
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_4, "Q9_4", "Attitudes", 4)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_4, "Q9_4", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_5, "Q9_5", "Attitudes", 5)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_5, "Q9_5", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_6, "Q9_6", "Attitudes",  6)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_6, "Q9_6", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_7, "Q9_7", "Attitudes", 7)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q9_7, "Q9_7", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_8, "Q9_8", "Attitudes", 8)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_8, "Q9_8", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_9, "Q9_9", "Attitudes", 9)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q9_9, "Q9_9", "Attitudes")
+```
+
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_10, "Q9_10", "Attitudes", 10)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q9_10, "Q9_10", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_11, "Q9_11", "Attitudes", 11)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_11, "Q9_11", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_12, "Q9_12", "Attitudes", 12)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,    Q9_12, "Q9_12", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_13, "Q9_13", "Attitudes", 13)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_13, "Q9_13", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_14, "Q9_14", "Attitudes", 14)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_14, "Q9_14", "Attitudes")
+```
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_15, "Q9_15", "Attitudes", 15)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,      Q9_15, "Q9_15", "Attitudes")
+```
+
+
+
+```{r}
+plot_gender_mtuas(mtuas,  Q9_16, "Q9_16", "Attitudes",  16)
+```
+
+\vspace{1em}
+
+```{r}
+plot_age_mtuas(mtuas,     Q9_16, "Q9_16", "Attitudes")
+```
+

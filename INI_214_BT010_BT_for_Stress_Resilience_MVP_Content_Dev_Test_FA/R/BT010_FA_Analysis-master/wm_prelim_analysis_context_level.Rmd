@@ -1,0 +1,101 @@
+---
+title: "Preliminary Analysis of Working Memory Data using Two Minute Features"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(stringr)
+
+setwd("~/Projects/Brain Therapy/MVP/Working Memory/BT010_FA_Analysis-master/")
+data = read_csv("./data/context_level_feature_data_wm.csv")
+source("helpers_wm.R")
+options(width = 90)
+```
+
+
+```{r, message=FALSE, echo=FALSE}
+responses = c(
+    "log_ecg_heart_rate", "log_ecg_hrv_std", "skin_temperature", "log_eda_mean",
+    "log_eda_no_of_peaks", "log_eda_lf", "log_eda_hf", "log_eda_lf_hf_ratio"
+)
+
+ecg_dat = data %>% 
+    mutate(
+        ecg_heart_rate = ifelse(
+            ecg_heart_rate < 50, NA, ecg_heart_rate
+        ), 
+        ecg_hrv_std = ifelse(
+            ecg_hrv_std > 250, NA, ecg_hrv_std
+        ), 
+        skin_temperature = ifelse(
+            skin_temperature < 10, NA, skin_temperature
+        ), 
+        log_ecg_heart_rate = log(ecg_heart_rate),
+        log_ecg_hrv_std = log(ecg_hrv_std),
+        log_eda_mean = log(eda_mean),
+        log_eda_hf = log(eda_hf), 
+        log_eda_lf = log(eda_lf), 
+        log_eda_lf_hf_ratio = log(eda_lf_hf_ratio),
+        log_eda_no_of_peaks = log(eda_no_of_peaks)
+    ) %>%
+    rename(
+        pid = Participant, 
+    ) %>%
+    select(
+        pid, type, context, context_order, one_of(responses)
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        context = as.factor(context)
+    ) %>%
+    select(-context_order)
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+for(i in 1:length(responses))
+{
+    resp = responses[i]
+    
+    hist(ecg_dat[, resp] %>% unlist() %>% as.numeric(), 
+         main = paste("Histogram of", resp), xlab = "")
+    formula_string = paste0(
+        resp, " ~ (1|pid) + time + type*context"
+    )
+    glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+    glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+    cat("################################################################### \n")
+    cat("The response/dependent variable is:", resp, "\n")
+    cat("################################################################### \n")
+    cat("#**************************************************# \n")
+    cat("ANOVA Table \n")
+    cat("#**************************************************# \n")
+    anova(glm_dat_lmerTest, type = "III") %>% print()
+    cat("#**************************************************# \n")
+    cat("All third order pairwise contrasts \n")
+    cat("Symbol order is Type:Diff:Percp \n")
+    cat("#**************************************************# \n")
+    emmeans(glm_dat_lme4, 
+            specs = pairwise ~ type:context
+        )$contrasts  %>%
+        tbl_df(.) %>%
+        print(n = 50)
+    cat("#**************************************************# \n")
+    cat("Difference in difference (2D - 3D) \n")
+    cat("Lower and Upper are from bootstrapped 95% CIs \n")
+    cat("#**************************************************# \n")
+    get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+    #plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+    #print(plots[[1]])
+    #print(plots[[2]])
+}
+```
+

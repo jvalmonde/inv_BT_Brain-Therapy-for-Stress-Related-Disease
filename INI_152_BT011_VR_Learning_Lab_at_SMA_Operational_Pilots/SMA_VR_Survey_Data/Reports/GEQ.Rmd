@@ -1,0 +1,33 @@
+---
+title: "Game Experience Questionnaire"
+author: "__Joyvalerie Mondejar, Gwyn Omar Magoncia__"
+date: _Last Updated:_ `r format(Sys.time(), '%B %d, %Y')`
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## __Introduction__
+
+This file contains the 
+
+__Input:__ File containing the scores on game experience questionnaire which is the geq.csv
+
+__Output:__ TBD
+
+_Date Created_: `r format(as.Date("2020-02-13"), "%B %d, %Y")`
+
+```{r setup and reading data, include = FALSE}
+knitr::opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE)
+library('here')
+library('data.table')
+library('magrittr')
+library('kableExtra')
+
+mtuas <- read.csv(here::here("Data", "geq.csv"))
+```
+

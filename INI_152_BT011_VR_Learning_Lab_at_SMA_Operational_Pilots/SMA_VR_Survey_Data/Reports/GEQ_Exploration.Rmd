@@ -1,0 +1,1248 @@
+---
+title: "Game Experience Questionnaire Exploration"
+author: "__Joyvalerie Mondejar, Gwyn Omar Magoncia__"
+date: _Last Updated:_ `r format(Sys.time(), '%B %d, %Y')`
+output: 
+  pdf_document:
+    number_sections: true
+---
+
+```{r loading-libraries-and-reading-data, include = FALSE}
+knitr::opts_chunk$set(comment = NA, echo = FALSE, warning = FALSE, message = FALSE)
+library('here')
+library('data.table')
+library('magrittr')
+library('kableExtra')
+library('ggplot2')
+
+geq_scoring <- fread(here::here("Data", "geq.csv"))
+mtuas <- fread(here::here("Data", "mtuas.csv"))
+mtuas_cluster <- readRDS(here::here("Data", "mtuas_cluster.rds"))
+```
+
+```{r sourcing-functions}
+source(here::here("R", "theme.R"))
+source(here::here("R", "plot_functions.R"))
+```
+
+```{r data-prep, include=FALSE}
+geq_scoring[, ID := as.numeric(substr(Q3, 11, 12))]
+setkey(geq_scoring, ID)
+setnames(geq_scoring, 'Q3', 'PID')
+
+mtuas_cluster[, ID := as.numeric(substr(Q11, 11, 12))]
+setkey(mtuas_cluster, ID)
+# getting age and gender from the GEQ file
+mtuas_demog <- mtuas_cluster[, .(Q11, Gender, Age, ID, Group)] %>%
+                           .[, Group := factor(Group, levels = c("1", "2", "3"))]
+
+setnames(mtuas_demog, 'Q11', 'PID')
+
+cols1 <- c(41:42)
+cols2 <- c(7:37)
+geq_scoring <- merge(geq_scoring, mtuas_demog, by = c('PID', 'ID'), all = TRUE) %>%
+                   .[!is.na(Q4),] %>% # Only 31 IDs, ID number 10 is missing
+                   .[, IGC1 := mean(c(Q1_2, Q1_9)), keyby = .(ID, Q4)] %>%
+                   .[, IGC2 := mean(c(Q1_1, Q1_4)), keyby = .(ID, Q4)] %>%
+                   .[, IGC3 := mean(c(Q1_5, Q1_10)), keyby = .(ID, Q4)] %>%
+                   .[, IGC4 := mean(c(Q1_6, Q1_8)), keyby = .(ID, Q4)] %>%
+                   .[, IGC5 := mean(c(Q1_12, Q1_13)), keyby = .(ID, Q4)] %>%
+                   .[, IGC6 := mean(c(Q1_3, Q1_7)), keyby = .(ID, Q4)] %>%
+                   .[, IGC7 := mean(c(Q1_11, Q1_14)), keyby = .(ID, Q4)] %>%
+                   .[, PGC1 := mean(c(Q2_1, Q2_5, Q2_7, Q2_8, Q2_12, Q2_16)), 
+                     keyby = .(ID, Q4)] %>%
+                   .[, PGC2 := mean(c(Q2_2, Q2_4, Q2_6, Q2_11, Q2_14, Q2_15)), 
+                     keyby = .(ID, Q4)] %>%
+                   .[, PGC3 := mean(c(Q2_10, Q2_13)), keyby = .(ID, Q4)] %>%
+                   .[, PGC4 := mean(c(Q2_3, Q2_9, Q2_17)), keyby = .(ID, Q4)] %>%
+                   .[, (cols1) := lapply(.SD, as.factor), .SDcols = cols1] %>%
+                   .[, (cols2) := lapply(.SD, factor, levels = c("1", "2", "3", "4", "5"),
+                                         labels = c("Not at all", "Slightly", "Moderately", 
+                                         "Fairly", "Extremely")), .SDcols = cols2]
+                   
+
+levels(geq_scoring$Age) <- c("18-30", "31-40", "41-50", "51-60", "61-70", "70+")
+levels(geq_scoring$Gender) <- c("Male", "Female")
+
+geq_scoring_go <- geq_scoring[Q4 <= 4,] # Oculus Go VR headset
+geq_scoring_rift <- geq_scoring[Q4 > 4,] # Oculus Rift VR headset
+```
+
+# __Introduction__
+
+This report contains the analysis of the Game Experience Questionnaire (GEQ) survey data. Currently, 
+the GEQ contains only the in-game and post-game modules. In this analysis, we will see how our 
+patient pool perceive virtual reality (VR) using two VR headsets, Oculus Go and Oculus Rift.
+
+# __Study Sample__
+
+32 patients went through a VR experiment at the Southwest Medical Associates (SMA) clinic in Las 
+Vegas, NV. Upon close inspection of the GEQ data, one patient was missing while the rest were
+divided into two groups based on the type of VR headsets used. 31 patients used Oculus Go while 18 
+used Oculus Rift.
+
+# __Results__
+
+This section is divided into three parts: Demographics, Components, and Plots. The first part
+contains the age group and gender breakdown under both VR headset groups. The second part contains 
+the median component scores for the two modules under both groups. The last part contains individual 
+plots for the responses of both groups on all questions of the two modules. The responses are broken 
+down based on gender and age groups.
+
+\clearpage
+
+## __Demographics__
+
+For both groups, there are more female than male patients and majority of these patients belong
+to the 51-60 age group.
+
+```{r gender-go}
+gender_go <- geq_scoring_go[, .(Count = .N), keyby = .(Gender)] %>%
+                          .[, .(Gender, Count, 
+                                Percentage = round(Count * 100 / nrow(geq_scoring_go), 1))]
+
+gender_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Gender Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r gender-rift}
+gender_rift <- geq_scoring_rift[, .(Count = .N), keyby = .(Gender)] %>% 
+                              .[, .(Gender, Count, 
+                                    Percentage = round(Count * 100 / nrow(geq_scoring_rift), 1))]
+
+gender_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Gender Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r age-go}
+age_go <- geq_scoring_go[, .(Count = .N), keyby = .(Age)] %>%
+                       .[, .(Age, Count, 
+                             Percentage = round(Count * 100 / nrow(geq_scoring_go), 1))]
+
+age_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Age Group Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r age-rift}
+age_rift <- geq_scoring_rift[, .(Count = .N), keyby = .(Age)] %>% 
+                           .[, .(Age, Count, 
+                                 Percentage = round(Count * 100 / nrow(geq_scoring_rift), 1))]
+
+age_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Age Group Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+## __Component Scores__
+
+For both modules, the median component scores for both groups are close to each other except for the 
+challenge component in the in-game module wherein the Oculus Rift group has a higher median score 
+than the Oculus Go group which implies that the users in the former group are having a hard time
+with the Oculus Rift VR headset.
+
+Overall, users from both groups have a positive experience with VR. However, the median scores for
+the positive experience of the in-game module are higher compared to the post-game module. This is 
+mostly due to the number of items considered in computing the average scores for these components, 
+two for the in-game positive affect component while six for the positive experience component.
+
+```{r in-game-comp-scores}
+ig_comp_score_go <- unique(geq_scoring_go[, c(44:50)] %>%
+                                        .[, lapply(.SD, function(x) {round(mean(x), 1)}), 
+                                          .SDcols = 1:7])
+ig_comp_score_rift <- unique(geq_scoring_rift[, c(44:50)] %>%
+                                            .[, lapply(.SD, function(x) {round(mean(x), 1)}), 
+                                              .SDcols = 1:7])
+comp_score <- as.data.frame(cbind(t(ig_comp_score_go), t(ig_comp_score_rift)))
+rownames(comp_score) <- NULL
+comp <- as.data.frame(rbind("Competence", "Sensory and Imaginative Immersion", "Flow",
+                            "Tension", "Challenge", "Negative affect", "Positive affect"))
+ig_comp_score <- cbind(comp, comp_score)
+colnames(ig_comp_score) <- c("Component", "Oculus Go VR Headset", "Oculus Rift VR Headset")
+
+ig_comp_score %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "In-game Mean Component Scores of Oculus Go vs. Oculus Rift") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r post-game-comp-scores}
+pg_comp_score_go <- unique(geq_scoring_go[, c(51:54)] %>%
+                                        .[, lapply(.SD, function(x) {format(round(mean(x), 1), 
+                                                                            nsmall = 1)}), 
+                                          .SDcols = 1:4])
+pg_comp_score_rift <- unique(geq_scoring_rift[, c(51:54)] %>%
+                                            .[, lapply(.SD, function(x) {format(round(mean(x), 1), 
+                                                                            nsmall = 1)}), 
+                                              .SDcols = 1:4])
+comp_score <- as.data.frame(cbind(t(pg_comp_score_go), t(pg_comp_score_rift)))
+rownames(comp_score) <- NULL
+comp <- as.data.frame(rbind("Positive Experience", "Negative Experience",
+                            "Tiredness", "Returning to Reality"))
+pg_comp_score <- cbind(comp, comp_score)
+colnames(pg_comp_score) <- c("Component", "Oculus Go VR Headset", "Oculus Rift VR Headset")
+
+pg_comp_score %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Post-game Mean Component Scores of Oculus Go vs. Oculus Rift") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+## __Clustering__
+
+Pprincipal component analysis (PCA) was used on the technology attitude questions and k-means 
+clustering was used to cluster the individuals into three clusters based on their attitude towards
+technology. Here are the descriptions for each cluster:
+
+* Cluster 1 consists of members having consistently high positive attitude towards technology
+* Cluster 2 consists of members having mixed attitudes towards technology
+* Cluster 3 consists of members having consistently high negative attitude towards technology
+
+```{r cluster-go}
+cluster_go <- geq_scoring_go[, .(Count = .N), keyby = .(Group)] %>%
+                           .[, .(Group, Count, 
+                                 Percentage = round(Count * 100 / nrow(geq_scoring_go), 1))]
+
+cluster_go %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Cluster Breakdown for Oculus Go VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+```{r cluster-rift}
+cluster_rift <- geq_scoring_rift[, .(Count = .N), keyby = .(Group)] %>% 
+                               .[, .(Group, Count, Percentage = round(Count * 100 / nrow(geq_scoring_rift), 1))]
+
+cluster_rift %>%
+  kable(align = c("l", "c", "c"), 
+        caption = "Cluster Breakdown for Oculus Rift VR Headset Users") %>%
+  row_spec(0, bold = TRUE) %>%
+  kable_styling(full_width = F, latex_options = "hold_position")
+```
+
+\clearpage
+
+```{r gender-cluster-go}
+df <- geq_scoring_go %>%
+  select(Group, Gender) %>%
+  group_by(Group, Gender) %>%
+  mutate(Count = n(), Percentage = round((Count / nrow(geq_scoring_go) * 100), 2)) %>%
+  unique()
+  
+ggplot(df, aes(Group, y = Percentage, fill = Gender)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Cluster", y = "Percentage", 
+       title = "Gender Breakdown by Cluster\nfor Oculus Go VR Users") +
+  scale_fill_manual(name = "Gender", values = c(uhg1, uhg2)) +
+  theme_joy_s
+```
+
+<!-- Adding extra spaces between plots -->
+\vspace{1em} 
+
+```{r age-cluster-go}
+df <- geq_scoring_go %>%
+  select(Group, Age) %>%
+  group_by(Group, Age) %>%
+  mutate(Count = n(), Percentage = round((Count / nrow(geq_scoring_go) * 100), 2)) %>%
+  unique()
+  
+ggplot(df, aes(Group, y = Percentage, fill = Age)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Cluster", y = "Percentage", 
+       title = "Age Group Breakdown by Cluster\nfor Oculus Go VR Users") +
+  scale_fill_manual(name = "Age Group", values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6)) +
+  theme_joy_s
+```
+
+\clearpage
+
+```{r gender-cluster-rift}
+df <- geq_scoring_rift %>%
+  select(Group, Gender) %>%
+  group_by(Group, Gender) %>%
+  mutate(Count = n(), Percentage = round((Count / nrow(geq_scoring_rift) * 100), 2)) %>%
+  unique()
+  
+ggplot(df, aes(Group, y = Percentage, fill = Gender)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Cluster", y = "Percentage", 
+       title = "Gender Breakdown by Cluster\nfor Oculus Rift VR Users") +
+  scale_fill_manual(name = "Gender", values = c(uhg1, uhg2)) +
+  theme_joy_s
+```
+
+\vspace{1em} 
+
+```{r age-cluster-rift}
+df <- geq_scoring_rift %>%
+  select(Group, Age) %>%
+  group_by(Group, Age) %>%
+  mutate(Count = n(), Percentage = round((Count / nrow(geq_scoring_rift) * 100), 2)) %>%
+  unique()
+  
+ggplot(df, aes(Group, y = Percentage, fill = Age)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Cluster", y = "Percentage", 
+       title = "Age Group Breakdown by Cluster\nfor Oculus Rift VR Users") +
+  scale_fill_manual(name = "Age Group", values = c(uhg1, uhg2, uhg3, uhg4, uhg5, uhg6)) +
+  theme_joy_s
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge In-game Components - Oculus Go}
+\vfill
+
+\clearpage
+
+```{r boxplot-in-game-components-1-2-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$IGC1 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Competence", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_go$IGC2 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Sensory and Imaginative\nImmersion", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em} 
+
+```{r boxplot-in-game-components-3-4-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$IGC3 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Flow", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_go$IGC4 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Tension", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+```{r boxplot-in-game-components-7-6-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$IGC7 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Positive Affect", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_go$IGC6 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Negative Affect", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em}
+
+```{r boxplot-in-game-components-5-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$IGC5 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Challenge", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge Post-game Components - Oculus Go}
+\vfill
+
+\clearpage
+
+```{r boxplot-post-game-components-1-2-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$PGC1 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Positive Experience", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_go$PGC2 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Negative Experience", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em}
+
+```{r boxplot-post-game-components-3-4-go}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_go$PGC3 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Tiredness", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_go$PGC4 ~ geq_scoring_go$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Returning to Reality", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge In-game Components - Oculus Rift}
+\vfill
+
+\clearpage
+
+```{r boxplot-in-game-components-1-2-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$IGC1 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Competence", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_rift$IGC2 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Sensory and Imaginative\nImmersion", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em} 
+
+```{r boxplot-in-game-components-3-4-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$IGC3 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Flow", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_rift$IGC4 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Tension", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+```{r boxplot-in-game-components-7-6-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$IGC7 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Positive Affect", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_rift$IGC6 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Negative Affect", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em}
+
+```{r boxplot-in-game-components-5-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$IGC5 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Challenge", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge Post-game Components - Oculus Rift}
+\vfill
+
+\clearpage
+
+```{r boxplot-post-game-components-1-2-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$PGC1 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Positive Experience", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_rift$PGC2 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Negative Experience", col = c(uhg3, uhg2, uhg4))
+```
+
+\vspace{1em}
+
+```{r boxplot-post-game-components-3-4-rift}
+par(mfrow = c(1, 2))
+boxplot(geq_scoring_rift$PGC3 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Tiredness", col = c(uhg3, uhg2, uhg4))
+boxplot(geq_scoring_rift$PGC4 ~ geq_scoring_rift$Group,
+        xlab = "Cluster", ylab = "Average Score", ylim = c(0, 5),
+        main = "Returning to Reality", col = c(uhg3, uhg2, uhg4))
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge In-game Module - Oculus Go}
+\vfill
+
+\clearpage
+
+```{r in-game-go-q1-age}
+plot_age(geq_scoring_go, Q1_1, "Q1_1", geq = 1, i = 1)
+```
+
+\vspace{1em} 
+
+```{r in-game-go-q1-gender}
+plot_gender(geq_scoring_go, Q1_1, "Q1_1")
+```
+
+\clearpage
+
+```{r in-game-go-q2-age}
+plot_age(geq_scoring_go, Q1_2, "Q1_2", geq = 1, i = 2)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q2-gender}
+plot_gender(geq_scoring_go, Q1_2, "Q1_2")
+```
+
+\clearpage
+
+```{r in-game-go-q3-age}
+plot_age(geq_scoring_go, Q1_3, "Q1_3", geq = 1, i = 3)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q3-gender}
+plot_gender(geq_scoring_go, Q1_3, "Q1_3")
+```
+
+\clearpage
+
+```{r in-game-go-q4-age}
+plot_age(geq_scoring_go, Q1_4, "Q1_4", geq = 1, i = 4)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q4-gender}
+plot_gender(geq_scoring_go, Q1_4, "Q1_4")
+```
+
+\clearpage
+
+```{r in-game-go-q5-age}
+plot_age(geq_scoring_go, Q1_5, "Q1_5", geq = 1, i = 5)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q5-gender}
+plot_gender(geq_scoring_go, Q1_5, "Q1_5")
+```
+
+\clearpage
+
+```{r in-game-go-q6-age}
+plot_age(geq_scoring_go, Q1_6, "Q1_6", geq = 1, i = 6)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q6-gender}
+plot_gender(geq_scoring_go, Q1_6, "Q1_6")
+```
+
+\clearpage
+
+```{r in-game-go-q7-age}
+plot_age(geq_scoring_go, Q1_7, "Q1_7", geq = 1, i = 7)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q7-gender}
+plot_gender(geq_scoring_go, Q1_7, "Q1_7")
+```
+
+\clearpage
+
+```{r in-game-go-q8-age}
+plot_age(geq_scoring_go, Q1_8, "Q1_8", geq = 1, i = 8)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q8-gender}
+plot_gender(geq_scoring_go, Q1_8, "Q1_8")
+```
+
+\clearpage
+
+```{r in-game-go-q9-age}
+plot_age(geq_scoring_go, Q1_9, "Q1_9", geq = 1, i = 9)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q9-gender}
+plot_gender(geq_scoring_go, Q1_9, "Q1_9")
+```
+
+\clearpage
+
+```{r in-game-go-q10-age}
+plot_age(geq_scoring_go, Q1_10, "Q1_10", geq = 1, i = 10)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q10-gender}
+plot_gender(geq_scoring_go, Q1_10, "Q1_10")
+```
+
+\clearpage
+
+```{r in-game-go-q11-age}
+plot_age(geq_scoring_go, Q1_11, "Q1_11", geq = 1, i = 11)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q11-gender}
+plot_gender(geq_scoring_go, Q1_11, "Q1_11")
+```
+
+\clearpage
+
+```{r in-game-go-q12-age}
+plot_age(geq_scoring_go, Q1_12, "Q1_12", geq = 1, i = 12)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q12-gender}
+plot_gender(geq_scoring_go, Q1_12, "Q1_12")
+```
+
+\clearpage
+
+```{r in-game-go-q13-age}
+plot_age(geq_scoring_go, Q1_13, "Q1_13", geq = 1, i = 13)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q13-gender}
+plot_gender(geq_scoring_go, Q1_13, "Q1_13")
+```
+
+\clearpage
+
+```{r in-game-go-q14-age}
+plot_age(geq_scoring_go, Q1_14, "Q1_14", geq = 1, i = 14)
+```
+
+\vspace{1em}
+
+```{r in-game-go-q14-gender}
+plot_gender(geq_scoring_go, Q1_14, "Q1_14")
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge In-game Module - Oculus Rift}
+\vfill
+
+\clearpage
+
+```{r in-game-rift-q1-age}
+plot_age(geq_scoring_rift, Q1_1, "Q1_1", geq = 1, i = 1)
+```
+
+\vspace{1em} 
+
+```{r in-game-rift-q1-gender}
+plot_gender(geq_scoring_rift, Q1_1, "Q1_1")
+```
+
+\clearpage
+
+```{r in-game-rift-q2-age}
+plot_age(geq_scoring_rift, Q1_2, "Q1_2", geq = 1, i = 2)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q2-gender}
+plot_gender(geq_scoring_rift, Q1_2, "Q1_2")
+```
+
+\clearpage
+
+```{r in-game-rift-q3-age}
+plot_age(geq_scoring_rift, Q1_3, "Q1_3", geq = 1, i = 3)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q3-gender}
+plot_gender(geq_scoring_rift, Q1_3, "Q1_3")
+```
+
+\clearpage
+
+```{r in-game-rift-q4-age}
+plot_age(geq_scoring_rift, Q1_4, "Q1_4", geq = 1, i = 4)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q4-gender}
+plot_gender(geq_scoring_rift, Q1_4, "Q1_4")
+```
+
+\clearpage
+
+```{r in-game-rift-q5-age}
+plot_age(geq_scoring_rift, Q1_5, "Q1_5", geq = 1, i = 5)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q5-gender}
+plot_gender(geq_scoring_rift, Q1_5, "Q1_5")
+```
+
+\clearpage
+
+```{r in-game-rift-q6-age}
+plot_age(geq_scoring_rift, Q1_6, "Q1_6", geq = 1, i = 6)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q6-gender}
+plot_gender(geq_scoring_rift, Q1_6, "Q1_6")
+```
+
+\clearpage
+
+```{r in-game-rift-q7-age}
+plot_age(geq_scoring_rift, Q1_7, "Q1_7", geq = 1, i = 7)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q7-gender}
+plot_gender(geq_scoring_rift, Q1_7, "Q1_7")
+```
+
+\clearpage
+
+```{r in-game-rift-q8-age}
+plot_age(geq_scoring_rift, Q1_8, "Q1_8", geq = 1, i = 8)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q8-gender}
+plot_gender(geq_scoring_rift, Q1_8, "Q1_8")
+```
+
+\clearpage
+
+```{r in-game-rift-q9-age}
+plot_age(geq_scoring_rift, Q1_9, "Q1_9", geq = 1, i = 9)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q9-gender}
+plot_gender(geq_scoring_rift, Q1_9, "Q1_9")
+```
+
+\clearpage
+
+```{r in-game-rift-q10-age}
+plot_age(geq_scoring_rift, Q1_10, "Q1_10", geq = 1, i = 10)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q10-gender}
+plot_gender(geq_scoring_rift, Q1_10, "Q1_10")
+```
+
+\clearpage
+
+```{r in-game-rift-q11-age}
+plot_age(geq_scoring_rift, Q1_11, "Q1_11", geq = 1, i = 11)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q11-gender}
+plot_gender(geq_scoring_rift, Q1_11, "Q1_11")
+```
+
+\clearpage
+
+```{r in-game-rift-q12-age}
+plot_age(geq_scoring_rift, Q1_12, "Q1_12", geq = 1, i = 12)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q12-gender}
+plot_gender(geq_scoring_rift, Q1_12, "Q1_12")
+```
+
+\clearpage
+
+```{r in-game-rift-q13-age}
+plot_age(geq_scoring_rift, Q1_13, "Q1_13", geq = 1, i = 13)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q13-gender}
+plot_gender(geq_scoring_rift, Q1_13, "Q1_13")
+```
+
+\clearpage
+
+```{r in-game-rift-q14-age}
+plot_age(geq_scoring_rift, Q1_14, "Q1_14", geq = 1, i = 14)
+```
+
+\vspace{1em}
+
+```{r in-game-rift-q14-gender}
+plot_gender(geq_scoring_rift, Q1_14, "Q1_14")
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge Post-game Module - Oculus Go}
+\vfill
+
+\clearpage
+
+```{r post-game-go-q1-age}
+plot_age(geq_scoring_go, Q2_1, "Q2_1", geq = 2, i = 1)
+```
+
+\vspace{1em} 
+
+```{r post-game-go-q1-gender}
+plot_gender(geq_scoring_go, Q2_1, "Q2_1")
+```
+
+\clearpage
+
+```{r post-game-go-q2-age}
+plot_age(geq_scoring_go, Q2_2, "Q2_2", geq = 2, i = 2)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q2-gender}
+plot_gender(geq_scoring_go, Q2_2, "Q2_2")
+```
+
+\clearpage
+
+```{r post-game-go-q3-age}
+plot_age(geq_scoring_go, Q2_3, "Q2_3", geq = 2, i = 3)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q3-gender}
+plot_gender(geq_scoring_go, Q2_3, "Q2_3")
+```
+
+\clearpage
+
+```{r post-game-go-q4-age}
+plot_age(geq_scoring_go, Q2_4, "Q2_4", geq = 2, i = 4)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q4-gender}
+plot_gender(geq_scoring_go, Q2_4, "Q2_4")
+```
+
+\clearpage
+
+```{r post-game-go-q5-age}
+plot_age(geq_scoring_go, Q2_5, "Q2_5", geq = 2, i = 5)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q5-gender}
+plot_gender(geq_scoring_go, Q2_5, "Q2_5")
+```
+
+\clearpage
+
+```{r post-game-go-q6-age}
+plot_age(geq_scoring_go, Q2_6, "Q2_6", geq = 2, i = 6)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q6-gender}
+plot_gender(geq_scoring_go, Q2_6, "Q2_6")
+```
+
+\clearpage
+
+```{r post-game-go-q7-age}
+plot_age(geq_scoring_go, Q2_7, "Q2_7", geq = 2, i = 7)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q7-gender}
+plot_gender(geq_scoring_go, Q2_7, "Q2_7")
+```
+
+\clearpage
+
+```{r post-game-go-q8-age}
+plot_age(geq_scoring_go, Q2_8, "Q2_8", geq = 2, i = 8)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q8-gender}
+plot_gender(geq_scoring_go, Q2_8, "Q2_8")
+```
+
+\clearpage
+
+```{r post-game-go-q9-age}
+plot_age(geq_scoring_go, Q2_9, "Q2_9", geq = 2, i = 9)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q9-gender}
+plot_gender(geq_scoring_go, Q2_9, "Q2_9")
+```
+
+\clearpage
+
+```{r post-game-go-q10-age}
+plot_age(geq_scoring_go, Q2_10, "Q2_10", geq = 2, i = 10)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q10-gender}
+plot_gender(geq_scoring_go, Q2_10, "Q2_10")
+```
+
+\clearpage
+
+```{r post-game-go-q11-age}
+plot_age(geq_scoring_go, Q2_11, "Q2_11", geq = 2, i = 11)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q11-gender}
+plot_gender(geq_scoring_go, Q2_11, "Q2_11")
+```
+
+\clearpage
+
+```{r post-game-go-q12-age}
+plot_age(geq_scoring_go, Q2_12, "Q2_12", geq = 2, i = 12)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q12-gender}
+plot_gender(geq_scoring_go, Q2_12, "Q2_12")
+```
+
+\clearpage
+
+```{r post-game-go-q13-age}
+plot_age(geq_scoring_go, Q2_13, "Q2_13", geq = 2, i = 13)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q13-gender}
+plot_gender(geq_scoring_go, Q2_13, "Q2_13")
+```
+
+\clearpage
+
+```{r post-game-go-q14-age}
+plot_age(geq_scoring_go, Q2_14, "Q2_14", geq = 2, i = 14)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q14-gender}
+plot_gender(geq_scoring_go, Q2_14, "Q2_14")
+```
+
+\clearpage
+
+```{r post-game-go-q15-age}
+plot_age(geq_scoring_go, Q2_15, "Q2_15", geq = 2, i = 15)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q15-gender}
+plot_gender(geq_scoring_go, Q2_15, "Q2_15")
+```
+
+\clearpage
+
+```{r post-game-go-q16-age}
+plot_age(geq_scoring_go, Q2_16, "Q2_16", geq = 2, i = 16)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q16-gender}
+plot_gender(geq_scoring_go, Q2_16, "Q2_16")
+```
+
+\clearpage
+
+```{r post-game-go-q17-age}
+plot_age(geq_scoring_go, Q2_17, "Q2_17", geq = 2, i = 17)
+```
+
+\vspace{1em}
+
+```{r post-game-go-q17-gender}
+plot_gender(geq_scoring_go, Q2_17, "Q2_17")
+```
+
+\clearpage
+
+\vspace*{\fill}
+\noindent
+\makebox[\textwidth]{\Huge Post-game Module - Oculus Rift}
+\vfill
+
+\clearpage
+
+```{r post-game-rift-q1-age}
+plot_age(geq_scoring_rift, Q2_1, "Q2_1", geq = 2, i = 1)
+```
+
+\vspace{1em} 
+
+```{r post-game-rift-q1-gender}
+plot_gender(geq_scoring_rift, Q2_1, "Q2_1")
+```
+
+\clearpage
+
+```{r post-game-rift-q2-age}
+plot_age(geq_scoring_rift, Q2_2, "Q2_2", geq = 2, i = 2)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q2-gender}
+plot_gender(geq_scoring_rift, Q2_2, "Q2_2")
+```
+
+\clearpage
+
+```{r post-game-rift-q3-age}
+plot_age(geq_scoring_rift, Q2_3, "Q2_3", geq = 2, i = 3)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q3-gender}
+plot_gender(geq_scoring_rift, Q2_3, "Q2_3")
+```
+
+\clearpage
+
+```{r post-game-rift-q4-age}
+plot_age(geq_scoring_rift, Q2_4, "Q2_4", geq = 2, i = 4)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q4-gender}
+plot_gender(geq_scoring_rift, Q2_4, "Q2_4")
+```
+
+\clearpage
+
+```{r post-game-rift-q5-age}
+plot_age(geq_scoring_rift, Q2_5, "Q2_5", geq = 2, i = 5)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q5-gender}
+plot_gender(geq_scoring_rift, Q2_5, "Q2_5")
+```
+
+\clearpage
+
+```{r post-game-rift-q6-age}
+plot_age(geq_scoring_rift, Q2_6, "Q2_6", geq = 2, i = 6)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q6-gender}
+plot_gender(geq_scoring_rift, Q2_6, "Q2_6")
+```
+
+\clearpage
+
+```{r post-game-rift-q7-age}
+plot_age(geq_scoring_rift, Q2_7, "Q2_7", geq = 2, i = 7)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q7-gender}
+plot_gender(geq_scoring_rift, Q2_7, "Q2_7")
+```
+
+\clearpage
+
+```{r post-game-rift-q8-age}
+plot_age(geq_scoring_rift, Q2_8, "Q2_8", geq = 2, i = 8)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q8-gender}
+plot_gender(geq_scoring_rift, Q2_8, "Q2_8")
+```
+
+\clearpage
+
+```{r post-game-rift-q9-age}
+plot_age(geq_scoring_rift, Q2_9, "Q2_9", geq = 2, i = 9)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q9-gender}
+plot_gender(geq_scoring_rift, Q2_9, "Q2_9")
+```
+
+\clearpage
+
+```{r post-game-rift-q10-age}
+plot_age(geq_scoring_rift, Q2_10, "Q2_10", geq = 2, i = 10)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q10-gender}
+plot_gender(geq_scoring_rift, Q2_10, "Q2_10")
+```
+
+\clearpage
+
+```{r post-game-rift-q11-age}
+plot_age(geq_scoring_rift, Q2_11, "Q2_11", geq = 2, i = 11)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q11-gender}
+plot_gender(geq_scoring_rift, Q2_11, "Q2_11")
+```
+
+\clearpage
+
+```{r post-game-rift-q12-age}
+plot_age(geq_scoring_rift, Q2_12, "Q2_12", geq = 2, i = 12)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q12-gender}
+plot_gender(geq_scoring_rift, Q2_12, "Q2_12")
+```
+
+\clearpage
+
+```{r post-game-rift-q13-age}
+plot_age(geq_scoring_rift, Q2_13, "Q2_13", geq = 2, i = 13)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q13-gender}
+plot_gender(geq_scoring_rift, Q2_13, "Q2_13")
+```
+
+\clearpage
+
+```{r post-game-rift-q14-age}
+plot_age(geq_scoring_rift, Q2_14, "Q2_14", geq = 2, i = 14)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q14-gender}
+plot_gender(geq_scoring_rift, Q2_14, "Q2_14")
+```
+
+\clearpage
+
+```{r post-game-rift-q15-age}
+plot_age(geq_scoring_rift, Q2_15, "Q2_15", geq = 2, i = 15)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q15-gender}
+plot_gender(geq_scoring_rift, Q2_15, "Q2_15")
+```
+
+\clearpage
+
+```{r post-game-rift-q16-age}
+plot_age(geq_scoring_rift, Q2_16, "Q2_16", geq = 2, i = 16)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q16-gender}
+plot_gender(geq_scoring_rift, Q2_16, "Q2_16")
+```
+
+\clearpage
+
+```{r post-game-rift-q17-age}
+plot_age(geq_scoring_rift, Q2_17, "Q2_17", geq = 2, i = 17)
+```
+
+\vspace{1em}
+
+```{r post-game-rift-q17-gender}
+plot_gender(geq_scoring_rift, Q2_17, "Q2_17")
+```
+
+
+

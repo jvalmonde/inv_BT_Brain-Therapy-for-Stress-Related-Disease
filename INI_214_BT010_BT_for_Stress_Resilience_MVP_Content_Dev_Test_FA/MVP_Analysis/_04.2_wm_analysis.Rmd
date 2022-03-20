@@ -1,0 +1,116 @@
+---
+title: "Preliminary Analysis of Working Memory Data using Two Minute Features"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE}
+
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(stringr)
+library(ztable)
+library(magrittr)
+
+options(width = 90)
+options(ztable.type = "html")
+
+setwd(".")
+data = read_csv("./data/data.csv")
+source("helpers_wm.R")
+```
+
+## Context Specifications
+
+Context | Cauldrons | Colors
+------- | --------- | ------
+  T1    |     3     |    4
+  T2    |     4     |    5
+  T3    |     4     |    6
+  T4    |     5     |    7
+
+```{r, message=FALSE, echo=FALSE}
+responses = c(names(data)[names(data) %in% c("Participant", "Context",
+                                      "Type", "Context_order", "Type_index") == FALSE])
+ecg_dat = data %>%
+    rename(
+      pid = Participant,
+      type = Type,
+      context = Context,
+      context_order = Context_order
+    ) %>%
+    select(
+      pid, type, context, context_order, one_of(responses)
+    ) %>%
+    mutate(
+      time = as.factor(context_order),
+      pid = as.factor(pid),
+      type = as.factor(type),
+      context = as.factor(context)
+    ) %>%
+    select(-context_order)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+p_val_df <- list()
+for(i in 1:length(responses))
+{
+    resp = responses[i]
+    
+    hist(ecg_dat[, resp] %>% unlist() %>% as.numeric(), 
+         main = paste("Histogram of", resp), xlab = "")
+    formula_string = paste0(
+        resp, " ~ (1|pid) + time + type*context"
+    )
+    glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+    glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+    cat("################################################################### \n")
+    cat("The response/dependent variable is:", resp, "\n")
+    cat("################################################################### \n")
+    cat("#**************************************************# \n")
+    cat("ANOVA Table \n")
+    cat("#**************************************************# \n")
+    anova(glm_dat_lmerTest, type = "III") %>% print()
+    cat("#**************************************************# \n")
+    cat("All third order pairwise contrasts \n")
+    cat("Symbol order is Type:Diff:Percp \n")
+    cat("#**************************************************# \n")
+    
+    av <- anova(glm_dat_lmerTest, type = "III") 
+    p_values <- list(av$`Pr(>F)`) %>% print ()
+    names (p_values) <- c(resp)
+    p_val_df <- append(p_val_df, p_values)
+    
+    emmeans(glm_dat_lme4, 
+            specs = pairwise ~ type:context
+        )$contrasts  %>%
+        tbl_df(.) %>%
+        print(n = 50)
+    cat("#**************************************************# \n")
+    cat("Difference in difference (2D - 3D) \n")
+    cat("Lower and Upper are from bootstrapped 95% CIs \n")
+    cat("#**************************************************# \n")
+    get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+    plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4)
+    print(plots[[1]])
+    print(plots[[2]])
+}
+```
+
+```{r, results='asis', echo=FALSE}
+dataframe <- do.call(rbind, p_val_df)
+colnames(dataframe) <- c(rownames(av))
+dataframe = subset(dataframe, select=-c(time))
+# row.names(dataframe) <- c("Heart Rate", "Heart Rate Variability", "Skin Temperature", "EDA Mean", "EDA No. of Peaks", "EDA Low Freq", "EDA High Freq", "EDA LF-HF Ratio")
+z = ztable(dataframe, size = 9)
+
+mycolor = gradientColor(low = "red", mid = "pink", high = "white", n=20)
+z %>% makeHeatmap(mycolor=mycolor) %>%
+    addCellColor(color="black") %>%
+    print (caption="p-values Heatmap Table")
+```
+

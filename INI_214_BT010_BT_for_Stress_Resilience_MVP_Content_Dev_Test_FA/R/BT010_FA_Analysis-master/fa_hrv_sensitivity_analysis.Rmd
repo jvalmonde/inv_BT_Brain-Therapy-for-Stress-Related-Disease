@@ -1,0 +1,298 @@
+---
+title: "HRV Sensitivity Analysis"
+output: html_document
+---
+
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(stringr)
+
+setwd("~/BT010_FA_Analysis/")
+data = read_csv("./data/feature_data.csv")
+source("helpers.R")
+options(width = 90)
+```
+
+# Do not drop any HRV values
+
+```{r, echo=FALSE, message=FALSE}
+# cleaning the data
+ecg_dat = data %>% 
+    mutate(
+        ecg_hrv_std_mean = ifelse(
+            ecg_hrv_std_mean > 1000000, NA, ecg_hrv_std_mean
+        ), 
+        log_ecg_hrv_std_mean = log(ecg_hrv_std_mean),
+    ) %>%
+    rename(
+        pid = Participant, 
+        type = Type
+    ) %>%
+    select(
+        pid, type, Difficulty, Perceptibility, context_order,
+        log_ecg_hrv_std_mean
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        difficulty = as.factor(ifelse(Difficulty == 0, 'L', 'H')), 
+        perceptibility = as.factor(ifelse(Perceptibility == 0, 'L', 'H'))
+    ) %>%
+    select(-context_order, - Difficulty, -Perceptibility)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+paste(
+  100 * sum(!is.na(ecg_dat$log_ecg_hrv_std_mean)) / nrow(ecg_dat) %>% round(2),
+  "percent of the data is being used"
+) %>% print()
+for(i in 1:1) 
+{
+  resp = "log_ecg_hrv_std_mean"
+  formula_string = paste0(
+      resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+  )
+  glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+  glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+  cat("################################################################### \n")
+  cat("The response/dependent variable is:", resp, "\n")
+  cat("################################################################### \n")
+  cat("#**************************************************# \n")
+  cat("ANOVA Table \n")
+  cat("#**************************************************# \n")
+  anova(glm_dat_lmerTest, type = "III") %>% print()
+  cat("#**************************************************# \n")
+  cat("All third order pairwise contrasts \n")
+  cat("Symbol order is Type:Diff:Percp \n")
+  cat("#**************************************************# \n")
+  emmeans(glm_dat_lme4, 
+          specs = pairwise ~ type:difficulty:perceptibility
+      )$contrasts  %>%
+      tbl_df(.) %>%
+      print(n = 50)
+  cat("#**************************************************# \n")
+  cat("Difference in difference (2D - 3D) \n")
+  cat("HL means Difficulty is High and Percept is Low \n")
+  cat("Lower and Upper are from bootstrapped 95% CIs \n")
+  cat("#**************************************************# \n")
+  get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+  plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+  print(plots[[1]])
+  print(plots[[2]])
+}
+```
+
+# Drop HRV values over 250
+
+```{r, echo=FALSE, message=FALSE}
+# cleaning the data
+ecg_dat = data %>% 
+    mutate(
+        ecg_hrv_std_mean = ifelse(
+            ecg_hrv_std_mean > 250, NA, ecg_hrv_std_mean
+        ), 
+        log_ecg_hrv_std_mean = log(ecg_hrv_std_mean),
+    ) %>%
+    rename(
+        pid = Participant, 
+        type = Type
+    ) %>%
+    select(
+        pid, type, Difficulty, Perceptibility, context_order,
+        log_ecg_hrv_std_mean
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        difficulty = as.factor(ifelse(Difficulty == 0, 'L', 'H')), 
+        perceptibility = as.factor(ifelse(Perceptibility == 0, 'L', 'H'))
+    ) %>%
+    select(-context_order, - Difficulty, -Perceptibility)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+paste(
+  100 * sum(!is.na(ecg_dat$log_ecg_hrv_std_mean)) / nrow(ecg_dat) %>% round(2),
+  "percent of the data is being used"
+) %>% print()
+for(i in 1:1) 
+{
+  resp = "log_ecg_hrv_std_mean"
+  formula_string = paste0(
+      resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+  )
+  glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+  glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+  cat("################################################################### \n")
+  cat("The response/dependent variable is:", resp, "\n")
+  cat("################################################################### \n")
+  cat("#**************************************************# \n")
+  cat("ANOVA Table \n")
+  cat("#**************************************************# \n")
+  anova(glm_dat_lmerTest, type = "III") %>% print()
+  cat("#**************************************************# \n")
+  cat("All third order pairwise contrasts \n")
+  cat("Symbol order is Type:Diff:Percp \n")
+  cat("#**************************************************# \n")
+  emmeans(glm_dat_lme4, 
+          specs = pairwise ~ type:difficulty:perceptibility
+      )$contrasts  %>%
+      tbl_df(.) %>%
+      print(n = 50)
+  cat("#**************************************************# \n")
+  cat("Difference in difference (2D - 3D) \n")
+  cat("HL means Difficulty is High and Percept is Low \n")
+  cat("Lower and Upper are from bootstrapped 95% CIs \n")
+  cat("#**************************************************# \n")
+  get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+  plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+  print(plots[[1]])
+  print(plots[[2]])
+}
+```
+
+# Drop HRV values over 150
+
+```{r, echo=FALSE, message=FALSE}
+# cleaning the data
+ecg_dat = data %>% 
+    mutate(
+        ecg_hrv_std_mean = ifelse(
+            ecg_hrv_std_mean > 150, NA, ecg_hrv_std_mean
+        ), 
+        log_ecg_hrv_std_mean = log(ecg_hrv_std_mean),
+    ) %>%
+    rename(
+        pid = Participant, 
+        type = Type
+    ) %>%
+    select(
+        pid, type, Difficulty, Perceptibility, context_order,
+        log_ecg_hrv_std_mean
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        difficulty = as.factor(ifelse(Difficulty == 0, 'L', 'H')), 
+        perceptibility = as.factor(ifelse(Perceptibility == 0, 'L', 'H'))
+    ) %>%
+    select(-context_order, - Difficulty, -Perceptibility)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+paste(
+  100 * sum(!is.na(ecg_dat$log_ecg_hrv_std_mean)) / nrow(ecg_dat) %>% round(2),
+  "percent of the data is being used"
+) %>% print()
+for(i in 1:1) 
+{
+  resp = "log_ecg_hrv_std_mean"
+  formula_string = paste0(
+      resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+  )
+  glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+  glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+  cat("################################################################### \n")
+  cat("The response/dependent variable is:", resp, "\n")
+  cat("################################################################### \n")
+  cat("#**************************************************# \n")
+  cat("ANOVA Table \n")
+  cat("#**************************************************# \n")
+  anova(glm_dat_lmerTest, type = "III") %>% print()
+  cat("#**************************************************# \n")
+  cat("All third order pairwise contrasts \n")
+  cat("Symbol order is Type:Diff:Percp \n")
+  cat("#**************************************************# \n")
+  emmeans(glm_dat_lme4, 
+          specs = pairwise ~ type:difficulty:perceptibility
+      )$contrasts  %>%
+      tbl_df(.) %>%
+      print(n = 50)
+  cat("#**************************************************# \n")
+  cat("Difference in difference (2D - 3D) \n")
+  cat("HL means Difficulty is High and Percept is Low \n")
+  cat("Lower and Upper are from bootstrapped 95% CIs \n")
+  cat("#**************************************************# \n")
+  get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+  plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+  print(plots[[1]])
+  print(plots[[2]])
+}
+```
+
+# Drop HRV values over 100
+
+```{r, echo=FALSE, message=FALSE}
+# cleaning the data
+ecg_dat = data %>% 
+    mutate(
+        ecg_hrv_std_mean = ifelse(
+            ecg_hrv_std_mean > 100, NA, ecg_hrv_std_mean
+        ), 
+        log_ecg_hrv_std_mean = log(ecg_hrv_std_mean),
+    ) %>%
+    rename(
+        pid = Participant, 
+        type = Type
+    ) %>%
+    select(
+        pid, type, Difficulty, Perceptibility, context_order,
+        log_ecg_hrv_std_mean
+    ) %>% 
+    mutate(
+        time = as.factor(context_order), 
+        pid = as.factor(pid), 
+        type = as.factor(type), 
+        difficulty = as.factor(ifelse(Difficulty == 0, 'L', 'H')), 
+        perceptibility = as.factor(ifelse(Perceptibility == 0, 'L', 'H'))
+    ) %>%
+    select(-context_order, - Difficulty, -Perceptibility)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+paste(
+  100 * sum(!is.na(ecg_dat$log_ecg_hrv_std_mean)) / nrow(ecg_dat) %>% round(2),
+  "percent of the data is being used"
+) %>% print()
+for(i in 1:1) 
+{
+  resp = "log_ecg_hrv_std_mean"
+  formula_string = paste0(
+      resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+  )
+  glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+  glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+  cat("################################################################### \n")
+  cat("The response/dependent variable is:", resp, "\n")
+  cat("################################################################### \n")
+  cat("#**************************************************# \n")
+  cat("ANOVA Table \n")
+  cat("#**************************************************# \n")
+  anova(glm_dat_lmerTest, type = "III") %>% print()
+  cat("#**************************************************# \n")
+  cat("All third order pairwise contrasts \n")
+  cat("Symbol order is Type:Diff:Percp \n")
+  cat("#**************************************************# \n")
+  emmeans(glm_dat_lme4, 
+          specs = pairwise ~ type:difficulty:perceptibility
+      )$contrasts  %>%
+      tbl_df(.) %>%
+      print(n = 50)
+  cat("#**************************************************# \n")
+  cat("Difference in difference (2D - 3D) \n")
+  cat("HL means Difficulty is High and Percept is Low \n")
+  cat("Lower and Upper are from bootstrapped 95% CIs \n")
+  cat("#**************************************************# \n")
+  get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+  plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4) 
+  print(plots[[1]])
+  print(plots[[2]])
+}
+```

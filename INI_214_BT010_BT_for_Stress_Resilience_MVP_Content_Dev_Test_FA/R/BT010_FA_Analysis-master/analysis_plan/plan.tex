@@ -1,0 +1,240 @@
+\documentclass[hidelinks]{article}
+
+\usepackage{amsthm} 
+\usepackage{bm} 
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage[authoryear]{natbib} 
+\usepackage[letterpaper, margin=1in]{geometry} 
+\usepackage{algorithm2e} 
+\usepackage{float}
+\allowdisplaybreaks 
+\usepackage{graphicx} 
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{setspace}
+\usepackage{authblk}
+\usepackage{hyperref}
+
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Validation of DxO Algorithm with Nurse Review}
+\lhead{Statistical Analysis Plan}
+\rfoot{\thepage}
+
+\setcounter{tocdepth}{3}
+
+\usepackage{array}
+\newcommand{\PreserveBackslash}[1]{\let\temp=\\#1\let\\=\temp}
+\newcolumntype{C}[1]{>{\PreserveBackslash\centering}p{#1}}
+\newcolumntype{R}[1]{>{\PreserveBackslash\raggedleft}p{#1}}
+\newcolumntype{L}[1]{>{\PreserveBackslash\raggedright}p{#1}}
+
+%*********************************************** 
+% custom latex commands
+%***********************************************
+\newcommand{\Real}{\mathbb{R}} 
+\newcommand{\Nat}{\mathbb{N}}
+\newcommand{\dom}{{\bf dom}\,} 
+\newcommand{\Tra}{^{\sf T}} % Transpose
+\newcommand{\Inv}{^{-1}} % Inverse 
+\newcommand{\diag}{\mathop{\rmdiag}\nolimits} 
+\newcommand{\tr}{\operatorname{tr}} % Trace
+\newcommand{\epi}{\operatorname{epi}} % epigraph
+\newcommand{\V}[1]{{\bm{\mathbf{\MakeLowercase{#1}}}}} % vector
+\newcommand{\VE}[2]{\MakeLowercase{#1}_{#2}} % vector element
+\newcommand{\Vn}[2]{\V{#1}^{(#2)}} % n-th vector
+\newcommand{\Vtilde}[1]{{\bm{\tilde \mathbf{\MakeLowercase{#1}}}}} % vector
+\newcommand{\Vhat}[1]{{\bm{\hat \mathbf{\MakeLowercase{#1}}}}} % vector
+\newcommand{\VtildeE}[2]{\tilde{\MakeLowercase{#1}}_{#2}} % vector element
+\newcommand{\M}[1]{{\bm{\mathbf{\MakeUppercase{#1}}}}} % matrix
+\newcommand{\ME}[2]{\MakeLowercase{#1}_{#2}} % matrix element
+\newcommand{\Mtilde}[1]{{\bm{\tilde \mathbf{\MakeUppercase{#1}}}}} % matrix
+\newcommand{\Mbar}[1]{{\bm{\bar \mathbf{\MakeUppercase{#1}}}}} % matrix
+\newcommand{\Mn}[2]{\M{#1}^{(#2)}} % n-th matrix
+\newcommand{\Minv}[1]{{\bm{\mathbf{\MakeUppercase{#1}}}}^{-1}} % matrix
+\newcommand{\Mhat}[1]{{\bm{\hat \mathbf{\MakeUppercase{#1}}}}} % vector
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+\newcommand{\normal}{\mathcal{N}} 
+\newcommand{\argmin}[1]{\underset{#1}{\text{ arg min }} }
+\newcommand{\simiid}{\overset{iid}{\sim}}
+
+% Definitions for vectors and matricies
+\def\A{{\bf A}} 
+\def\a{{\bf a}} 
+
+\def\B{{\bf B}} 
+\def\b{{\bf b}} 
+
+\def\Btilde{\Mtilde{B}}
+\def\btilde{\Vtilde{b}}
+
+\def\C{{\bf C}} 
+\def\c{{\bf c}} 
+
+\def\D{{\bf D}} 
+\def\d{{\bf d}}
+
+\def\E{{\bf E}} 
+\def\e{{\bf e}} 
+
+\def\ehat{{\Vhat{e}}} 
+
+\def\F{{\bf F}} 
+\def\f{{\bf f}} 
+
+\def\G{{\bf G}}
+\def\g{{\bf g}} 
+
+\def\H{{\bf H}} 
+\def\h{{\bf h}} 
+
+\def\I{{\bf I}}
+
+\def\J{{\bf J}}
+\def\j{{\bf j}}
+
+\def\K{{\bf K}} 
+\def\k{{\bf k}} 
+
+\def\L{{\bf L}}
+\def\l{{\bf l}}
+
+\def\M{{\bf M}}
+\def\m{{\bf m}}
+
+\def\N{{\bf N}}
+\def\n{{\bf n}}
+
+\def\P{{\bf P}} 
+\def\p{{\bf p}} 
+
+\def\Q{{\bf Q}} 
+\def\q{{\bf q}} 
+
+\def\R{{\bf R}}
+\def\rr{{\bf r}} 
+
+\def\S{{\bf S}} 
+\def\s{{\bf s}} 
+
+\def\T{{\bf T}} 
+\def\t{{\bf t}} 
+
+\def\U{{\bf U}}
+\def\u{{\bf u}}
+
+\def\W{{\bf W}} 
+\def\w{{\bf w}} 
+
+\def\Wtilde{\Mtilde{W}}
+
+\def\X{{\bf X}} 
+\def\x{{\bf x}} 
+
+\def\Xtilde{\Mtilde{X}}
+\def \xtx{{\X\Tra \X}}
+
+\def\Y{{\bf Y}}
+\def\y{{\bf y}} 
+
+\newcommand{\yty}{\y \Tra \y}
+
+\def\Z{{\bf Z}} 
+\def\z{{\bf z}} 
+
+\def\Ztilde{\Mtilde{Z}}
+\def \ZtZ{{\Z \Tra \Z}} 
+\def\ztz{{\z \Tra \z}}
+
+% vector of ones
+\def \vone{{\bf 1}}
+
+% vectors for greek letters
+\def \valpha{{\V{\alpha}}}
+
+\def \vbeta{{\V{\beta}}}
+
+\def \vpi{{\V{\pi}}}
+
+\def \vmu{{\V{\mu}}}
+
+\def \mpsi{{\M{\Psi}}} 
+\def \vpsi{{\V{\psi}}}
+
+\def \mlambda{{\M{\Lambda}}}
+
+\def \mtheta{{\M{\Theta}}} 
+\def \vtheta{{\V{\theta}}}
+
+\def \mgamma{{\M{\Gamma}}} 
+\def \vgamma{{\V{\gamma}}}
+\def \mgammainv{{\M{\Gamma}\Inv}} 
+
+\def \msigma{{\M{\Sigma}}}
+
+% shortcuts for script letters
+\def \Cs{{\mathcal{C}}}
+\def \Vs{{\mathcal{V}}}
+\def \Ns{{\mathcal{N}}}
+
+% problem/theorem environments
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{problem}{Problem}[section]
+
+%*********************************************** 
+% end custom latex commands
+%***********************************************
+
+%opening
+\title{
+	Proposed Analyses for Focused Attention Pilot \\
+} 
+
+\author{Suchit Mehrotra, Joseph Roxas, Lillian Lingcaro, Chin-Chin Amar}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction} 
+
+The goal of this analysis is to estimate differences in sensor derived features for content delivered in virtual reality versus 2D. In the proposed model, we will control for a time effect due the temporal nature of the experiment, subject specific effects, due to the repeated measures per subject, and additional treatment factors that vary game conditions.  
+
+\section{Model 1}
+
+We propose the following model: 
+\begin{align}
+	y_{ijkl} = \mu + \pi_i + \delta_j + \alpha_k + \beta_l + (\alpha \beta)_{kl} + e_{ijkl},
+\end{align}
+
+where $i$ indexes time periods with $i \in \{1, \dots, 8\}$, $j$ indexes subjects with $j \in \{1, \dots, 20\}$, 
+$k$ indexes the treatment for VR/2D with $k \in \{1, 2\}$, $l$ indexes the four game conditions (HH, HL, LH, LL) with $l \in \{1, \dots, 4\}$, $\delta$ is a random effect with $\delta_j \sim \normal(0, \sigma^2_\delta)$, and $e_{ijkl} \sim \normal(0, \sigma^2_e)$. This analysis will allow us to estimate treatment effects while controlling for an unconstrained temporal effect, $\pi$, and let us estimate differences in means between different groups of conditions. For example, if we want to estimate the difference between HH and LL when a patient is delivered content in VR versus 2D we can use the following equation: 
+\begin{align*}
+(\bar{y}_{\cdot\cdot11} - \bar{y}_{\cdot \cdot 1 4}) - (\bar{y}_{\cdot\cdot21} - \bar{y}_{\cdot \cdot 2 4}) & = \left[(\mu + \bar{\pi}_{\cdot} + \bar{\delta}_{\cdot} + \alpha_1 + \beta_1 + (\alpha \beta)_{11}) - (\mu + \bar{\pi}_{\cdot} + \bar{\delta}_{\cdot}  + \alpha_1 + \beta_4 + (\alpha \beta)_{14}) \right] - \\
+& \ \ \ \ \  
+	\left[(\mu + \bar{\pi}_{\cdot} + \bar{\delta}_{\cdot} + \alpha_2 + \beta_1 + (\alpha \beta)_{21}) - (\mu + \bar{\pi}_{\cdot} + \bar{\delta}_{\cdot}  + \alpha_2 + \beta_4 + (\alpha \beta)_{24}) \right] \\
+& = (\beta_1 + (\alpha \beta)_{11} - \beta_4 - (\alpha \beta)_{14}) - 
+	(\beta_1 + (\alpha \beta)_{21} - \beta_4 - (\alpha \beta)_{24}) \\
+& = (\alpha \beta)_{11} - (\alpha \beta)_{14} - (\alpha \beta)_{21} + (\alpha \beta)_{24}
+\end{align*}
+where $\alpha_1$ and $\alpha_2$ are the effect for VR and 2D, respectively, and $\beta_1$ and $\beta_4$ are the effects for the HH and LL conditions, respectively.
+
+\section{Model 2}
+
+This model would be the same as Model 1 but with $i \in \{1, \dots, 4\}$. Arguably, this is a more appropriate model due to the washout (transition) period between an individual receiving content in VR versus 2D. 
+
+\section{Model 3}
+
+We can also separate the game condition treatments into two factors, difficulty and perceptibility, with both set to either high (H) or low (L). The model becomes: 
+\begin{align*}
+	y_{ijklm} = \mu + \pi_i + \delta_j + \alpha_k + \beta_{l} + \gamma_m + 
+		(\alpha \beta)_{kl} + (\alpha \gamma)_{km} + (\beta \gamma)_{lm} + 
+		(\alpha \beta \gamma)_{klm} + e_{ijklm},
+\end{align*}
+where the parameter $\beta$ indexes difficulty and $\gamma$ indexes perceptibility, with $l, m \in \{1, 2\}$. All other parameters are the same as above. It should be noted that, due to our small sample size, the 12 additional parameters in this model have the potential to reduce the power of our hypothesis tests. 
+
+\end{document}

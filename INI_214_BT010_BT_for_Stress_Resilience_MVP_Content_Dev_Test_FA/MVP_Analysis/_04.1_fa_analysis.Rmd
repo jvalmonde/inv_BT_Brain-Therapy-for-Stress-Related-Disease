@@ -1,0 +1,113 @@
+---
+title: "Preliminary Analysis of Focused Attention Data using Two Minute Features"
+output: html_document
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(stringr)
+library(ztable)
+library(magrittr)
+
+options(width = 90)
+options(ztable.type = "html")
+
+setwd(".")
+data = read_csv("./data/data.csv")
+source("helpers_fa.R")
+
+```
+
+```{r, message=FALSE, echo=FALSE}
+responses = c(names(data)[names(data) %in% c("Participant", "Context",
+                                      "Type", "Context_order", "Type_index") == FALSE])
+data$Difficulty <- substr(data$Context, 1,1)
+data$Perceptibility <- substr(data$Context, 2,2)
+ecg_dat = data %>%
+    rename(
+      pid = Participant,
+      type = Type,
+      context = Context,
+      context_order = Context_order
+    ) %>%
+    select(
+      pid, type, Difficulty, Perceptibility, context_order, one_of(responses)
+    ) %>%
+    mutate(
+      time = as.factor(context_order),
+      pid = as.factor(pid),
+      type = as.factor(type),
+      difficulty = as.factor(Difficulty),
+      perceptibility = as.factor(Perceptibility)
+    ) %>%
+    select(-context_order, -Difficulty, -Perceptibility)
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+p_val_df <- list()
+for(i in 1:length(responses))
+{
+    resp = responses[i]
+    
+    hist(ecg_dat[, resp] %>% unlist() %>% as.numeric(), 
+         main = paste("Histogram of", resp), xlab = "")
+    formula_string = paste0(
+        resp, " ~ (1|pid) + time + type*difficulty*perceptibility"
+    )
+    glm_dat_lme4 = lme4::lmer(as.formula(formula_string), data = ecg_dat)
+    glm_dat_lmerTest = lmerTest::lmer(as.formula(formula_string), data = ecg_dat)
+    cat("################################################################### \n")
+    cat("The response/dependent variable is:", resp, "\n")
+    cat("################################################################### \n")
+    cat("#**************************************************# \n")
+    cat("ANOVA Table \n")
+    cat("#**************************************************# \n")
+    anova(glm_dat_lmerTest, type = "III") %>% print()
+    cat("#**************************************************# \n")
+    cat("All third order pairwise contrasts \n")
+    cat("Symbol order is Type:Diff:Percp \n")
+    cat("#**************************************************# \n")
+    
+    av <- anova(glm_dat_lmerTest, type = "III") 
+    p_values <- list(av$`Pr(>F)`) %>% print ()
+    names (p_values) <- c(resp)
+    p_val_df <- append(p_val_df, p_values)
+
+    emmeans(glm_dat_lme4, 
+            specs = pairwise ~ type:difficulty:perceptibility
+        )$contrasts  %>%
+        tbl_df(.) %>%
+        print(n = 50)
+    cat("#**************************************************# \n")
+    cat("Difference in difference (2D - 3D) \n")
+    cat("HL means Difficulty is High and Percept is Low \n")
+    cat("Lower and Upper are from bootstrapped 95% CIs \n")
+    cat("#**************************************************# \n")
+    get_diff_in_diff(ecg_dat, glm_dat_lme4, resp,n_sim = 100) %>% print()
+    plots = make_interaction_plot(ecg_dat, resp, glm_dat_lme4)
+    print(plots[[1]])
+    print(plots[[2]])
+}
+```
+
+```{r, results='asis', echo=FALSE}
+dataframe <- do.call(rbind, p_val_df)
+colnames(dataframe) <- c(rownames(av))
+colnames(dataframe) <- c("time","type","difficulty","perceptibility","type_difficulty","type_perceptiblity","difficulty_perceptibility","type_difficulty_perceptibility")
+dataframe = subset(dataframe, select=-c(time, type_difficulty_perceptibility))
+# row.names(dataframe) <- c("Heart Rate", "Heart Rate Variability", "Skin Temperature", "EDA Mean", "EDA No. of Peaks", "EDA Low Freq", "EDA High Freq", "EDA LF-HF Ratio")
+z = ztable(dataframe, size = 9)
+
+mycolor = gradientColor(low = "red", mid = "pink", high = "white", n=20)
+z %>% makeHeatmap(mycolor=mycolor) %>%
+    addCellColor(color="black") %>%
+    print (caption="p-values Heatmap Table")
+
+```
+
